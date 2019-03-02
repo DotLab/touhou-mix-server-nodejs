@@ -1,0 +1,19 @@
+{
+  "name": "thmix-sv-nodejs",
+  "version": "1.0.0",
+  "description": "Server for Touhou Mix",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "eslint ."
+  },
+  "author": "Kailang Fu",
+  "license": "CC-BY-NC-SA-4.0",
+  "dependencies": {
+    "debug": "^4.1.1",
+    "eslint": "^5.12.1",
+    "eslint-config-google": "^0.11.0",
+    "express": "^4.16.4",
+    "mongoose": "^5.4.7"
+  }
+}
