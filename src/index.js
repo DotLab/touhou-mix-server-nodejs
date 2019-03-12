@@ -25,8 +25,9 @@ const io = require('socket.io')(port);
 const VERSION = 0;
 const INTENT_WEB = 'web';
 
-function success(data) {
-  return {success: true, data};
+function success(done, data) {
+  if (typeof done === 'function') done({success: true, data});
+  else debug('  done is not a function');
 }
 
 // function error(data) {
@@ -37,7 +38,7 @@ io.on('connection', function(socket) {
   debug('connection', socket.id);
 
   socket.on('cl_handshake', (info, done) => {
-    debug('cl_handshake', socket.id, info);
+    debug('  cl_handshake', socket.id, info);
 
     if (info.version !== VERSION) {
       socket.disconnect();
@@ -47,6 +48,6 @@ io.on('connection', function(socket) {
     // if (info.intent === INTENT_WEB) {
     // }
 
-    done(success({version: VERSION, intent: INTENT_WEB}));
+    success(done, {version: VERSION, intent: INTENT_WEB});
   });
 });
