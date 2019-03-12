@@ -34,19 +34,35 @@ function success(done, data) {
 //   return {error: true, data};
 // }
 
+const axios = require('axios');
+const {RECAPTCHA_SECRET} = require('./secrets');
+
 io.on('connection', function(socket) {
   debug('connection', socket.id);
 
-  socket.on('cl_handshake', (info, done) => {
-    debug('  cl_handshake', socket.id, info);
+  socket.on('cl_handshake', ({version, intent}, done) => {
+    debug('  cl_handshake', version, intent);
 
-    if (info.version !== VERSION) {
+    if (version !== VERSION) {
       socket.disconnect();
       return;
     }
 
-    // if (info.intent === INTENT_WEB) {
-    // }
+    if (intent === INTENT_WEB) {
+      socket.on('cl_web_register', ({recaptcha, username, email, password}, done) => {
+        debug('  cl_web_register', recaptcha, username, email, password);
+        axios.post('https://www.google.com/recaptcha/api/siteverify', null, {
+          params: {
+            secret: RECAPTCHA_SECRET,
+            response: recaptcha,
+            remoteip: socket.handshake.headers['x-forwarded-for'],
+          },
+        }).then((res) => {
+          debug(res.data);
+          success(done);
+        });
+      });
+    }
 
     success(done, {version: VERSION, intent: INTENT_WEB});
   });
