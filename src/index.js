@@ -13,9 +13,37 @@ const mongoose = require('mongoose');
 mongoose.connect(`mongodb://localhost:27017/${database}`, {useNewUrlParser: true});
 mongoose.set('useFindAndModify', false);
 
+const {Storage} = require('@google-cloud/storage');
+const storage = new Storage();
+const bucket = storage.bucket('thmix-static');
+
+// const fs = require('fs');
+
+// (async () => {
+//   const storage = new Storage();
+//   // const res = await storage.bucket('thmix-static').file('Icon1.png').getSignedUrl({
+//   //   action: 'read',
+//   //   expires: Date.now() + 1000 * 60,
+//   // });
+
+//   const res = await storage.bucket('thmix-static').upload('./package.json', {
+//     metadata: {
+//       acl: [
+//         {
+//           entity: 'allUsers',
+//           role: storage.acl.READER_ROLE,
+//         },
+//       ],
+//     },
+//   });
+
+//   console.log(res);
+// })();
+
+
 // const {User} = require('./models');
 // User.deleteMany({}).exec();
 
 const io = require('socket.io')(port);
 const Server = require('./Server');
-new Server(io);
+new Server(io, bucket);

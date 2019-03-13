@@ -11,6 +11,7 @@
   "author": "Kailang Fu",
   "license": "CC-BY-NC-SA-4.0",
   "dependencies": {
+    "@google-cloud/storage": "^2.4.2",
     "axios": "^0.18.0",
     "debug": "^4.1.1",
     "eslint": "^5.12.1",

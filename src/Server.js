@@ -5,7 +5,12 @@ const Session = require('./Session');
 const VERSION = 0;
 
 module.exports = class Server {
-  constructor(io) {
+  constructor(io, bucket) {
+    /** @type {import('socket.io').Server} */
+    this.io = io;
+    /** @type {import('@google-cloud/storage').Bucket} */
+    this.bucket = bucket;
+
     /** @type {Object.<string, Session>} */
     this.sessions = {};
     this.version = VERSION;
