@@ -1,5 +1,6 @@
 
 const axios = require('axios');
+const mongoose = require('mongoose');
 
 const {RECAPTCHA_SECRET} = require('./secrets');
 
@@ -13,4 +14,8 @@ exports.verifyRecaptcha = async function(recaptcha, ip) {
     },
   });
   return res.data.success;
+};
+
+exports.verifyObjectId = function(objectId) {
+  return mongoose.Types.ObjectId.isValid(objectId);
 };

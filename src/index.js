@@ -13,6 +13,9 @@ const mongoose = require('mongoose');
 mongoose.connect(`mongodb://localhost:27017/${database}`, {useNewUrlParser: true});
 mongoose.set('useFindAndModify', false);
 
+// const {User} = require('./models');
+// User.deleteMany({}).exec();
+
 const io = require('socket.io')(port);
 const Server = require('./Server');
 new Server(io);

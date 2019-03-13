@@ -4,7 +4,7 @@ const debug = require('debug')('thmix:Session');
 
 const {User} = require('./models');
 
-const {verifyRecaptcha} = require('./utils');
+const {verifyRecaptcha, verifyObjectId} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -63,18 +63,19 @@ module.exports = class Session {
   listenWebClient() {
     this.socket.on('cl_web_register', this.onClWebRegister.bind(this));
     this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
+    this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
   }
 
   listenAppClient() {
   }
 
-  async onClWebRegister({recaptcha, username, email, password}, done) {
-    debug('  cl_web_register', username, email, password);
+  async onClWebRegister({recaptcha, name, email, password}, done) {
+    debug('  cl_web_register', name, email, password);
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
 
-    const user = await User.findOne({$or: [{username}, {email}]});
-    if (user) return error(done, 'existing username or email');
+    const user = await User.findOne({$or: [{name}, {email}]});
+    if (user) return error(done, 'existing name or email');
 
     const salt = crypto.randomBytes(256).toString('base64');
     const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -82,7 +83,15 @@ module.exports = class Session {
     hasher.update(salt);
     const hash = hasher.digest('base64');
 
-    await User.create({username, email, salt, hash});
+    const now = new Date();
+    await User.create({
+      name, email, salt, hash,
+      joinedDate: now, seenDate: now,
+      playCount: 0,
+      totalScores: 0,
+      maxCombo: 0,
+      accuracy: 0,
+    });
 
     success(done);
   }
@@ -102,9 +111,32 @@ module.exports = class Session {
 
     if (hash === user.hash) { // matched
       this.user = user;
-      return success(done, {id: user.id, username: user.username});
+      User.findByIdAndUpdate(user.id, {$set: {seenDate: new Date()}}).exec();
+      return success(done, {id: user.id, name: user.name});
     }
 
     error(done, 'wrong combination');
+  }
+
+  async onClWebGetUser({userId}, done) {
+    debug('cl_web_get_user', userId);
+
+    if (typeof userId !== 'string' || !verifyObjectId(userId)) {
+      return error(done, 'not found');
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return error(done, 'not found');
+
+    const {
+      id, name, joinedDate, seenDate, bio,
+      playCount, totalScores, maxCombo, accuracy,
+      totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    } = user;
+    success(done, {
+      id, name, joinedDate, seenDate, bio,
+      playCount, totalScores, maxCombo, accuracy,
+      totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    });
   }
 };
