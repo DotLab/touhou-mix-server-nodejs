@@ -12,6 +12,7 @@ exports.User = mongoose.model('User', {
   joinedDate: Date,
   seenDate: Date,
   bio: String,
+  avatarUrl: String,
   // cached
   playCount: Number,
   totalScores: Number,

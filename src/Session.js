@@ -64,6 +64,7 @@ module.exports = class Session {
     this.socket.on('cl_web_register', this.onClWebRegister.bind(this));
     this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
     this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
+    this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
   }
 
   listenAppClient() {
@@ -110,9 +111,8 @@ module.exports = class Session {
     const hash = hasher.digest('base64');
 
     if (hash === user.hash) { // matched
-      this.user = user;
-      User.findByIdAndUpdate(user.id, {$set: {seenDate: new Date()}}).exec();
-      return success(done, {id: user.id, name: user.name});
+      this.user = await User.findByIdAndUpdate(user.id, {$set: {seenDate: new Date()}}, {new: true});
+      return success(done, serializeUser(this.user));
     }
 
     error(done, 'wrong combination');
@@ -128,15 +128,28 @@ module.exports = class Session {
     const user = await User.findById(userId);
     if (!user) return error(done, 'not found');
 
-    const {
-      id, name, joinedDate, seenDate, bio,
-      playCount, totalScores, maxCombo, accuracy,
-      totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
-    } = user;
-    success(done, {
-      id, name, joinedDate, seenDate, bio,
-      playCount, totalScores, maxCombo, accuracy,
-      totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
-    });
+    success(done, serializeUser(user));
+  }
+
+  async onClWebUserUpdateBio({bio}, done) {
+    debug('cl_web_user_update_bio', bio);
+
+    if (!this.user) return error(done, 'forbidden');
+
+    this.user = await User.findByIdAndUpdate(this.user.id, {$set: {bio}}, {new: true});
+    success(done, serializeUser(this.user));
   }
 };
+
+function serializeUser(user) {
+  const {
+    id, name, joinedDate, seenDate, bio,
+    playCount, totalScores, maxCombo, accuracy,
+    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+  } = user;
+  return {
+    id, name, joinedDate, seenDate, bio,
+    playCount, totalScores, maxCombo, accuracy,
+    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+  };
+}
