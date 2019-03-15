@@ -19,3 +19,5 @@ exports.verifyRecaptcha = async function(recaptcha, ip) {
 exports.verifyObjectId = function(objectId) {
   return mongoose.Types.ObjectId.isValid(objectId);
 };
+
+exports.emptyHandle = () => {};

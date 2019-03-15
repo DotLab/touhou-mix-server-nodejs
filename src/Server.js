@@ -5,11 +5,13 @@ const Session = require('./Session');
 const VERSION = 0;
 
 module.exports = class Server {
-  constructor(io, bucket) {
+  constructor(io, storage, tempPath) {
     /** @type {import('socket.io').Server} */
     this.io = io;
+    this.storage = storage;
+    this.tempPath = tempPath;
     /** @type {import('@google-cloud/storage').Bucket} */
-    this.bucket = bucket;
+    this.bucket = storage.bucket('thmix-static');
 
     /** @type {Object.<string, Session>} */
     this.sessions = {};
@@ -29,5 +31,20 @@ module.exports = class Server {
       this.sessions[socketId].socket.disconnect();
     } else debug('ending mal-formed session', socketId);
     delete this.sessions[socketId];
+  }
+
+  bucketUploadPublic(file, destination) {
+    return this.bucket.upload(file, {
+      destination,
+      metadata: {
+        gzip: true,
+        cacheControl: 'public, max-age=31536000',
+        acl: [{entity: 'allUsers', role: this.storage.acl.READER_ROLE}],
+      },
+    });
+  }
+
+  bucketGetPublicUrl(path) {
+    return 'https://storage.googleapis.com/thmix-static' + path;
   }
 };

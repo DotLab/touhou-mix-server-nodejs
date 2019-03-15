@@ -1,10 +1,12 @@
 const crypto = require('crypto');
+const sharp = require('sharp');
+const fs = require('fs');
 
 const debug = require('debug')('thmix:Session');
 
 const {User} = require('./models');
 
-const {verifyRecaptcha, verifyObjectId} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -65,6 +67,7 @@ module.exports = class Session {
     this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
     this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
+    this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
   }
 
   listenAppClient() {
@@ -139,16 +142,44 @@ module.exports = class Session {
     this.user = await User.findByIdAndUpdate(this.user.id, {$set: {bio}}, {new: true});
     success(done, serializeUser(this.user));
   }
+
+  async onClWebUserUploadAvatar({size, buffer}, done) {
+    debug('cl_web_user_upload_avatar', size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 1048576) return error(done, 'tampering with api');
+
+    const hasher = crypto.createHash('md5');
+    hasher.update(buffer);
+    const hash = hasher.digest('hex');
+    const remotePath = `/imgs/${hash}.jpg`;
+    const avatarUrl = this.server.bucketGetPublicUrl(remotePath);
+
+    if (remotePath === this.user.avatarPath) return success(done, serializeUser(this.user));
+
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    await sharp(buffer).resize(256, 256).jpeg({quality: 80}).toFile(localPath);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    // if (this.user.avatarPath) {  // delete old avatar (ignore dependents)
+    //   this.server.bucket.file(this.user.avatarPath).delete().catch(emptyHandle);
+    // }
+
+    this.user = await User.findByIdAndUpdate(this.user.id, {$set: {avatarUrl, avatarPath: remotePath}}, {new: true});
+    success(done, serializeUser(this.user));
+  }
 };
 
 function serializeUser(user) {
   const {
-    id, name, joinedDate, seenDate, bio,
+    id, name, joinedDate, seenDate, bio, avatarUrl,
     playCount, totalScores, maxCombo, accuracy,
     totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
-    id, name, joinedDate, seenDate, bio,
+    id, name, joinedDate, seenDate, bio, avatarUrl,
     playCount, totalScores, maxCombo, accuracy,
     totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };

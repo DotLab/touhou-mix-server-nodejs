@@ -15,9 +15,18 @@ mongoose.set('useFindAndModify', false);
 
 const {Storage} = require('@google-cloud/storage');
 const storage = new Storage();
-const bucket = storage.bucket('thmix-static');
 
-// const fs = require('fs');
+const tempPath = './temp';
+const fs = require('fs');
+const path = require('path');
+if (fs.existsSync(tempPath)) {
+  const files = fs.readdirSync(tempPath);
+  for (const file of files) {
+    fs.unlinkSync(path.join(tempPath, file));
+  }
+} else {
+  fs.mkdirSync(tempPath);
+}
 
 // (async () => {
 //   const storage = new Storage();
@@ -46,4 +55,4 @@ const bucket = storage.bucket('thmix-static');
 
 const io = require('socket.io')(port);
 const Server = require('./Server');
-new Server(io, bucket);
+new Server(io, storage, tempPath);
