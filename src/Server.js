@@ -10,8 +10,10 @@ module.exports = class Server {
     this.io = io;
     this.storage = storage;
     this.tempPath = tempPath;
+
+    this.buketName = 'thmix-static';
     /** @type {import('@google-cloud/storage').Bucket} */
-    this.bucket = storage.bucket('thmix-static');
+    this.bucket = storage.bucket(this.buketName);
 
     /** @type {Object.<string, Session>} */
     this.sessions = {};
@@ -45,6 +47,6 @@ module.exports = class Server {
   }
 
   bucketGetPublicUrl(path) {
-    return 'https://storage.googleapis.com/thmix-static' + path;
+    return 'https://storage.googleapis.com/' + this.buketName + path;
   }
 };

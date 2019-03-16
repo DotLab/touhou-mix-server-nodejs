@@ -91,6 +91,7 @@ module.exports = class Session {
 
   async onClWebRegister({recaptcha, name, email, password}, done) {
     debug('  cl_web_register', name, email, password);
+
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
 

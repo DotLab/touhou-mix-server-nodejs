@@ -1,9 +1,13 @@
 const debug = require('debug')('thmix');
 
 const env = process.env.NODE_ENV;
-let port = '6003';
-let database = 'thmix';
-if (env === 'staging') {
+
+let port;
+let database;
+if (env !== 'staging') {
+  port = '6003';
+  database = 'thmix';
+} else {
   port = '6004';
   database = 'thmix-staging';
 }
@@ -27,28 +31,6 @@ if (fs.existsSync(tempPath)) {
 } else {
   fs.mkdirSync(tempPath);
 }
-
-// (async () => {
-//   const storage = new Storage();
-//   // const res = await storage.bucket('thmix-static').file('Icon1.png').getSignedUrl({
-//   //   action: 'read',
-//   //   expires: Date.now() + 1000 * 60,
-//   // });
-
-//   const res = await storage.bucket('thmix-static').upload('./package.json', {
-//     metadata: {
-//       acl: [
-//         {
-//           entity: 'allUsers',
-//           role: storage.acl.READER_ROLE,
-//         },
-//       ],
-//     },
-//   });
-
-//   console.log(res);
-// })();
-
 
 // const {User} = require('./models');
 // User.deleteMany({}).exec();
