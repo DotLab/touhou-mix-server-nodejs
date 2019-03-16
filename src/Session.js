@@ -26,6 +26,17 @@ function error(done, data) {
   else debug('  done is not a function');
 }
 
+function genPasswordSalt() {
+  return crypto.randomBytes(256).toString('base64');
+}
+
+function calcPasswordHash(password, salt) {
+  const hasher = crypto.createHash(PASSWORD_HASHER);
+  hasher.update(password);
+  hasher.update(salt);
+  return hasher.digest('base64');
+}
+
 module.exports = class Session {
   /**
    * @param {Server} server
@@ -44,6 +55,10 @@ module.exports = class Session {
     this.user = null;
 
     socket.on('cl_handshake', this.onClHandshake.bind(this));
+  }
+
+  updateUser(spec) {
+    return User.findByIdAndUpdate(this.user.id, spec, {new: true});
   }
 
   onClHandshake({version, intent}, done) {
@@ -67,6 +82,7 @@ module.exports = class Session {
     this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
     this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
+    this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
   }
 
@@ -81,11 +97,8 @@ module.exports = class Session {
     const user = await User.findOne({$or: [{name}, {email}]});
     if (user) return error(done, 'existing name or email');
 
-    const salt = crypto.randomBytes(256).toString('base64');
-    const hasher = crypto.createHash(PASSWORD_HASHER);
-    hasher.update(password);
-    hasher.update(salt);
-    const hash = hasher.digest('base64');
+    const salt = genPasswordSalt();
+    const hash = calcPasswordHash(password, salt);
 
     const now = new Date();
     await User.create({
@@ -108,13 +121,10 @@ module.exports = class Session {
     const user = await User.findOne({email: email});
     if (!user) return error(done, 'wrong combination');
 
-    const hasher = crypto.createHash(PASSWORD_HASHER);
-    hasher.update(password);
-    hasher.update(user.salt);
-    const hash = hasher.digest('base64');
-
+    const hash = calcPasswordHash(password, user.salt);
     if (hash === user.hash) { // matched
-      this.user = await User.findByIdAndUpdate(user.id, {$set: {seenDate: new Date()}}, {new: true});
+      this.user = user;
+      this.user = await this.updateUser({seenDate: new Date()});
       return success(done, serializeUser(this.user));
     }
 
@@ -139,8 +149,22 @@ module.exports = class Session {
 
     if (!this.user) return error(done, 'forbidden');
 
-    this.user = await User.findByIdAndUpdate(this.user.id, {$set: {bio}}, {new: true});
+    this.user = await this.updateUser({bio});
     success(done, serializeUser(this.user));
+  }
+
+  async onClWebUserUpdatePassword({currentPassword, password}, done) {
+    debug('cl_web_user_update_password', currentPassword, password);
+
+    if (!this.user) return error(done, 'forbidden');
+    const hash = calcPasswordHash(currentPassword, this.user.salt);
+    if (hash !== this.user.hash) return error(done, 'forbidden');
+
+    const newSalt = genPasswordSalt();
+    const newHash = calcPasswordHash(password, newSalt);
+    this.user = await this.updateUser({hash: newHash, salt: newSalt});
+
+    success(done);
   }
 
   async onClWebUserUploadAvatar({size, buffer}, done) {
