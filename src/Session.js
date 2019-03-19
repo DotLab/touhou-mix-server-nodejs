@@ -6,7 +6,7 @@ const debug = require('debug')('thmix:Session');
 
 const {User} = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -53,6 +53,7 @@ module.exports = class Session {
     this.socketIp = socket.handshake.headers['x-forwarded-for'];
 
     this.user = null;
+    this.pendingCode = null;
 
     socket.on('cl_handshake', this.onClHandshake.bind(this));
   }
@@ -79,6 +80,7 @@ module.exports = class Session {
 
   listenWebClient() {
     this.socket.on('cl_web_register', this.onClWebRegister.bind(this));
+    this.socket.on('cl_web_register_pre', this.onClWebRegisterPre.bind(this));
     this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
     this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
@@ -89,11 +91,26 @@ module.exports = class Session {
   listenAppClient() {
   }
 
-  async onClWebRegister({recaptcha, name, email, password}, done) {
-    debug('  cl_web_register', name, email, password);
+  async onClWebRegisterPre({recaptcha, name, email}, done) {
+    debug('  cl_web_register_pre', name, email);
 
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
+
+    const user = await User.findOne({$or: [{name}, {email}]});
+    if (user) return error(done, 'existing name or email');
+
+    this.pendingCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    await sendCodeEmail(name, email, 'register', this.pendingCode);
+
+    success(done);
+  }
+
+  async onClWebRegister({code, name, email, password}, done) {
+    debug('  cl_web_register', code, name, email, password);
+
+    if (!this.pendingCode || code != this.pendingCode) return error(done, 'wrong code');
+    this.pendingCode = null;
 
     const user = await User.findOne({$or: [{name}, {email}]});
     if (user) return error(done, 'existing name or email');
@@ -105,10 +122,21 @@ module.exports = class Session {
     await User.create({
       name, email, salt, hash,
       joinedDate: now, seenDate: now,
+
       playCount: 0,
       totalScores: 0,
       maxCombo: 0,
       accuracy: 0,
+
+      totalPlayTime: 0,
+      weightedPp: 0,
+      ranking: 0,
+      sCount: 0,
+      aCount: 0,
+      bCount: 0,
+      cCount: 0,
+      dCount: 0,
+      fCount: 0,
     });
 
     success(done);
@@ -116,6 +144,7 @@ module.exports = class Session {
 
   async onClWebLogin({recaptcha, email, password}, done) {
     debug('cl_web_login', email, password);
+
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
 

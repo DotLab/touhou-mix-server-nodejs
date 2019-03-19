@@ -34,6 +34,37 @@ if (fs.existsSync(tempPath)) {
 
 // const {User} = require('./models');
 // User.deleteMany({}).exec();
+// const crypto = require('crypto');
+// function genPasswordSalt() {
+//   return crypto.randomBytes(256).toString('base64');
+// }
+// function calcPasswordHash(password, salt) {
+//   const hasher = crypto.createHash('sha512');
+//   hasher.update(password);
+//   hasher.update(salt);
+//   return hasher.digest('base64');
+// }
+// const salt = genPasswordSalt();
+// const hash = calcPasswordHash('test', salt);
+// User.create({
+//   name: 'Test', email: 'test@test.com', salt, hash,
+//   joinedDate: new Date(), seenDate: new Date(),
+
+//   playCount: 0,
+//   totalScores: 0,
+//   maxCombo: 0,
+//   accuracy: 0,
+
+//   totalPlayTime: 0,
+//   weightedPp: 0,
+//   ranking: 0,
+//   sCount: 0,
+//   aCount: 0,
+//   bCount: 0,
+//   cCount: 0,
+//   dCount: 0,
+//   fCount: 0,
+// });
 
 const io = require('socket.io')(port);
 const Server = require('./Server');
