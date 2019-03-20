@@ -13,7 +13,7 @@ script:
     chmod 600 /tmp/web-worker-key;
     eval `ssh-agent`;
     ssh-add /tmp/web-worker-key;
-    ssh web-worker@35.233.171.1 "cd repositories/thmix-sv-nodejs/ && git pull && npm ci && pm2 restart thmix-server";
+    ssh web-worker@35.233.171.1 "cd repositories/touhou-mix-server-nodejs/ && git pull && npm ci && pm2 restart thmix-server";
     kill $SSH_AGENT_PID;
   fi
 - if [ "$BRANCH" == "staging" ]; then
@@ -22,6 +22,6 @@ script:
     chmod 600 /tmp/web-worker-key;
     eval `ssh-agent`;
     ssh-add /tmp/web-worker-key;
-    ssh web-worker@35.233.171.1 "cd repositories/thmix-sv-nodejs/ && git pull && npm ci && pm2 restart thmix-server-staging";
+    ssh web-worker@35.233.171.1 "cd repositories/touhou-mix-server-nodejs/ && git pull && npm ci && pm2 restart thmix-server-staging";
     kill $SSH_AGENT_PID;
   fi
