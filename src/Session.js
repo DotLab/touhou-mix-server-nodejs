@@ -1,12 +1,13 @@
 const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
+const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 
 const debug = require('debug')('thmix:Session');
 
-const {User} = require('./models');
+const {User, Midi} = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -35,6 +36,12 @@ function calcPasswordHash(password, salt) {
   hasher.update(password);
   hasher.update(salt);
   return hasher.digest('base64');
+}
+
+function calcFileHash(buffer) {
+  const hasher = crypto.createHash('md5');
+  hasher.update(buffer);
+  return hasher.digest('hex');
 }
 
 module.exports = class Session {
@@ -86,6 +93,9 @@ module.exports = class Session {
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
+    this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
+    this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
+    this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
   }
 
   listenAppClient() {
@@ -164,9 +174,7 @@ module.exports = class Session {
   async onClWebGetUser({userId}, done) {
     debug('cl_web_get_user', userId);
 
-    if (typeof userId !== 'string' || !verifyObjectId(userId)) {
-      return error(done, 'not found');
-    }
+    if (!verifyObjectId(userId)) return error(done, 'not found');
 
     const user = await User.findById(userId);
     if (!user) return error(done, 'not found');
@@ -204,9 +212,7 @@ module.exports = class Session {
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > 1048576) return error(done, 'tampering with api');
 
-    const hasher = crypto.createHash('md5');
-    hasher.update(buffer);
-    const hash = hasher.digest('hex');
+    const hash = calcFileHash(buffer);
     const remotePath = `/imgs/${hash}.jpg`;
     const avatarUrl = this.server.bucketGetPublicUrl(remotePath);
 
@@ -224,16 +230,125 @@ module.exports = class Session {
     this.user = await User.findByIdAndUpdate(this.user.id, {$set: {avatarUrl, avatarPath: remotePath}}, {new: true});
     success(done, serializeUser(this.user));
   }
+
+  async onClWebMidiUpload({name, size, buffer}, done) {
+    debug('cl_web_midi_upload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 1048576) return error(done, 'tampering with api');
+
+    const hash = calcFileHash(buffer);
+    const midiFile = MidiParser.parse(buffer);
+    if (!midiFile || !(midiFile.tracks > 0)) return error(done, 'tampering with api');
+
+    let midi = await Midi.findOne({hash});
+    if (midi) return success(done, {duplicated: true, id: midi.id});
+
+    const remotePath = `/midis/${hash}.mid`;
+    const localPath = `${this.server.tempPath}/${hash}.mid`;
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPrivate(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    midi = await Midi.create({
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name, desc: name,
+      hash, path: remotePath,
+
+      uploadedDate: new Date(),
+
+      touhouAlbumIndex: -1,
+      touhouSongIndex: -1,
+
+      comments: [],
+      records: [],
+    });
+
+    success(done, {id: midi.id});
+  }
+
+  async onClWebMidiUpdate(update, done) {
+    debug('cl_web_midi_update', update.id);
+
+    const {
+      id, name, desc, artistName, artistUrl,
+      sourceArtistName, sourceAlbumName, sourceSongName,
+      touhouAlbumIndex, touhouSongIndex,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+
+    let midi = await Midi.findById(id);
+    if (!midi) return error(done, 'not found');
+    if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      name, desc, artistName, artistUrl,
+      sourceArtistName, sourceAlbumName, sourceSongName,
+      touhouAlbumIndex, touhouSongIndex,
+    });
+
+    midi = await Midi.findByIdAndUpdate(id, {$set: update});
+
+    success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiGet({id}, done) {
+    debug('cl_web_midi_get', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const midi = await Midi.findById(id);
+    if (!midi) return error(done, 'not found');
+
+    success(done, serializeMidi(midi));
+  }
 };
+
+function serializeMidi(midi) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, desc, artistName, artistUrl,
+    uploadedDate, approvedDate,
+    sourceArtistName, sourceAlbumName, sourceSongName,
+    touhouAlbumIndex, touhouSongIndex,
+    comments, records,
+    trialCount, upCount, downCount, loveCount,
+    avgScores, avgMaxCombo, avgAccuracy,
+    passCount, failCount,
+    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+  } = midi;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, desc, artistName, artistUrl,
+    uploadedDate, approvedDate,
+    sourceArtistName, sourceAlbumName, sourceSongName,
+    touhouAlbumIndex, touhouSongIndex,
+    comments, records,
+    trialCount, upCount, downCount, loveCount,
+    avgScores, avgMaxCombo, avgAccuracy,
+    passCount, failCount,
+    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+  };
+}
 
 function serializeUser(user) {
   const {
-    id, name, joinedDate, seenDate, bio, avatarUrl,
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl,
     playCount, totalScores, maxCombo, accuracy,
     totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
-    id, name, joinedDate, seenDate, bio, avatarUrl,
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl,
     playCount, totalScores, maxCombo, accuracy,
     totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };

@@ -32,8 +32,9 @@ if (fs.existsSync(tempPath)) {
   fs.mkdirSync(tempPath);
 }
 
-// const {User} = require('./models');
+// const {User, Midi} = require('./models');
 // User.deleteMany({}).exec();
+// Midi.deleteMany({}).exec();
 // const crypto = require('crypto');
 // function genPasswordSalt() {
 //   return crypto.randomBytes(256).toString('base64');

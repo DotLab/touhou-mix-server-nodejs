@@ -21,7 +21,7 @@ exports.verifyRecaptcha = async function(recaptcha, ip) {
 };
 
 exports.verifyObjectId = function(objectId) {
-  return mongoose.Types.ObjectId.isValid(objectId);
+  return (typeof objectId === 'string') && mongoose.Types.ObjectId.isValid(objectId);
 };
 
 exports.emptyHandle = () => {};
@@ -53,4 +53,11 @@ The Touhou Mix Team
 https://thmix.org/help`;
 
   return sendEmail('Touhou Mix Support', 'no-reply@mail.thmix.org', userEmail, 'Your Touhou Mix account: Attempt to ' + action, text);
+};
+
+exports.filterUndefinedKeys = function(obj) {
+  return Object.keys(obj).reduce((acc, cur) => {
+    if (obj[cur] !== undefined) acc[cur] = obj[cur];
+    return acc;
+  }, {});
 };
