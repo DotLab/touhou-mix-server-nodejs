@@ -15,13 +15,13 @@ exports.User = mongoose.model('User', {
   avatarUrl: String,
   avatarPath: String,
   // cached
-  playCount: Number,
-  totalScores: Number,
-  maxCombo: Number,
+  trialCount: Number,
+  score: Number,
+  combo: Number,
   accuracy: Number,
 
-  totalPlayTime: Number,
-  weightedPp: Number,
+  playTime: Number,
+  performance: Number,
   ranking: Number,
   sCount: Number,
   aCount: Number,
@@ -30,6 +30,51 @@ exports.User = mongoose.model('User', {
   dCount: Number,
   fCount: Number,
 });
+
+exports.serializeUser = function(user) {
+  const {
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl,
+    playCount, totalScores, maxCombo, accuracy,
+    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+  } = user;
+  return {
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl,
+    playCount, totalScores, maxCombo, accuracy,
+    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+  };
+};
+
+exports.createDefaultUser = function() {
+  return {
+    name: '',
+    email: '',
+    salt: '',
+    hash: '',
+    // meta
+    joinedDate: null,
+    seenDate: null,
+    bio: '',
+    avatarUrl: '',
+    avatarPath: '',
+    // cached
+    trialCount: 0,
+    score: 0,
+    combo: 0,
+    accuracy: 0,
+
+    playTime: 0,
+    performance: 0,
+    ranking: 0,
+    sCount: 0,
+    aCount: 0,
+    bCount: 0,
+    cCount: 0,
+    dCount: 0,
+    fCount: 0,
+  };
+};
 
 exports.Midi = mongoose.model('Midi', {
   uploaderId: ObjectId,
@@ -86,8 +131,8 @@ exports.Midi = mongoose.model('Midi', {
   downCount: Number,
   loveCount: Number,
 
-  avgScores: Number,
-  avgMaxCombo: Number,
+  avgScore: Number,
+  avgCombo: Number,
   avgAccuracy: Number,
 
   passCount: Number,
@@ -99,6 +144,114 @@ exports.Midi = mongoose.model('Midi', {
   cCutoff: Number,
   dCutoff: Number,
 });
+
+exports.serializeMidi = function(midi) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, desc, artistName, artistUrl,
+    uploadedDate, approvedDate,
+    sourceArtistName, sourceAlbumName, sourceSongName,
+    touhouAlbumIndex, touhouSongIndex,
+    comments, records,
+    trialCount, upCount, downCount, loveCount,
+    avgScores, avgMaxCombo, avgAccuracy,
+    passCount, failCount,
+    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+  } = midi;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, desc, artistName, artistUrl,
+    uploadedDate, approvedDate,
+    sourceArtistName, sourceAlbumName, sourceSongName,
+    touhouAlbumIndex, touhouSongIndex,
+    comments, records,
+    trialCount, upCount, downCount, loveCount,
+    avgScores, avgMaxCombo, avgAccuracy,
+    passCount, failCount,
+    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+  };
+};
+
+exports.createDefaultMidi = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    desc: '',
+    hash: '',
+    path: '',
+    artistName: '',
+    artistUrl: '',
+    // meta
+    uploadedDate: null,
+    approvedDate: null,
+    // source
+    sourceArtistName: '',
+    sourceAlbumName: '',
+    sourceSongName: '',
+
+    touhouAlbumIndex: -1,
+    touhouSongIndex: -1,
+    // comments
+    comments: [],
+    // cached
+    records: [],
+
+    trialCount: 0,
+    upCount: 0,
+    downCount: 0,
+    loveCount: 0,
+
+    avgScore: 0,
+    avgCombo: 0,
+    avgAccuracy: 0,
+
+    passCount: 0,
+    failCount: 0,
+
+    sCutoff: 0,
+    aCutoff: 0,
+    bCutoff: 0,
+    cCutoff: 0,
+    dCutoff: 0,
+  };
+};
+
+exports.createDefaultMidiComment = function() {
+  return {
+    userId: null,
+    userName: '',
+    userAvatarUrl: '',
+    grade: '',
+    date: null,
+
+    text: '',
+  };
+};
+
+exports.createDefaultMidiRecord = function() {
+  return {
+    userId: null,
+    userName: '',
+    userAvatarUrl: '',
+    grade: '',
+    date: null,
+
+    score: 0,
+    combo: 0,
+    accuracy: 0,
+    performance: 0,
+
+    perfectCount: 0,
+    greatCount: 0,
+    goodCount: 0,
+    missCount: 0,
+  };
+};
 
 exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,

@@ -20,7 +20,7 @@ module.exports = class Server {
     this.version = VERSION;
 
     io.on('connection', (socket) => {
-      debug('connection', socket.id);
+      debug('onConnection', socket.id);
       this.sessions[socket.id] = new Session(this, socket);
     });
   }

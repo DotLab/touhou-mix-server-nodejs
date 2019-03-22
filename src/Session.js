@@ -5,7 +5,7 @@ const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi} = require('./models');
+const {User, Midi, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -14,6 +14,7 @@ const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefi
 
 const INTENT_WEB = 'web';
 const PASSWORD_HASHER = 'sha512';
+const MB = 1048576;
 
 function success(done, data) {
   debug('    success');
@@ -44,6 +45,10 @@ function calcFileHash(buffer) {
   return hasher.digest('hex');
 }
 
+function genPendingCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
 module.exports = class Session {
   /**
    * @param {Server} server
@@ -70,7 +75,7 @@ module.exports = class Session {
   }
 
   onClHandshake({version, intent}, done) {
-    debug('  cl_handshake', version, intent);
+    debug('  onClHandshake', version, intent);
 
     if (version !== this.server.version) {
       return this.server.endSession(this.socket.id);
@@ -86,23 +91,23 @@ module.exports = class Session {
   }
 
   listenWebClient() {
-    this.socket.on('cl_web_register', this.onClWebRegister.bind(this));
-    this.socket.on('cl_web_register_pre', this.onClWebRegisterPre.bind(this));
-    this.socket.on('cl_web_login', this.onClWebLogin.bind(this));
-    this.socket.on('cl_web_get_user', this.onClWebGetUser.bind(this));
+    this.socket.on('cl_web_user_register', this.onClWebUserRegister.bind(this));
+    this.socket.on('cl_web_user_register_pre', this.onClWebUserRegisterPre.bind(this));
+    this.socket.on('cl_web_user_login', this.onClWebUserLogin.bind(this));
+    this.socket.on('cl_web_user_get', this.onClWebUserGet.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
-    this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
+    this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
   }
 
   listenAppClient() {
   }
 
-  async onClWebRegisterPre({recaptcha, name, email}, done) {
-    debug('  cl_web_register_pre', name, email);
+  async onClWebUserRegisterPre({recaptcha, name, email}, done) {
+    debug('  onClWebUserRegisterPre', name, email);
 
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
@@ -110,14 +115,14 @@ module.exports = class Session {
     const user = await User.findOne({$or: [{name}, {email}]});
     if (user) return error(done, 'existing name or email');
 
-    this.pendingCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+    this.pendingCode = genPendingCode();
     await sendCodeEmail(name, email, 'register', this.pendingCode);
 
     success(done);
   }
 
-  async onClWebRegister({code, name, email, password}, done) {
-    debug('  cl_web_register', code, name, email, password);
+  async onClWebUserRegister({code, name, email, password}, done) {
+    debug('  onClWebUserRegister', code, name, email, password);
 
     if (!this.pendingCode || code != this.pendingCode) return error(done, 'wrong code');
     this.pendingCode = null;
@@ -130,30 +135,17 @@ module.exports = class Session {
 
     const now = new Date();
     await User.create({
+      ...createDefaultUser(),
+
       name, email, salt, hash,
       joinedDate: now, seenDate: now,
-
-      playCount: 0,
-      totalScores: 0,
-      maxCombo: 0,
-      accuracy: 0,
-
-      totalPlayTime: 0,
-      weightedPp: 0,
-      ranking: 0,
-      sCount: 0,
-      aCount: 0,
-      bCount: 0,
-      cCount: 0,
-      dCount: 0,
-      fCount: 0,
     });
 
     success(done);
   }
 
-  async onClWebLogin({recaptcha, email, password}, done) {
-    debug('cl_web_login', email, password);
+  async onClWebUserLogin({recaptcha, email, password}, done) {
+    debug('  onClWebUserLogin', email, password);
 
     const res = await verifyRecaptcha(recaptcha, this.socketIp);
     if (res !== true) return error(done, 'invalid recaptcha');
@@ -171,19 +163,19 @@ module.exports = class Session {
     error(done, 'wrong combination');
   }
 
-  async onClWebGetUser({userId}, done) {
-    debug('cl_web_get_user', userId);
+  async onClWebUserGet({id}, done) {
+    debug('  onClWebUserGet', id);
 
-    if (!verifyObjectId(userId)) return error(done, 'not found');
+    if (!verifyObjectId(id)) return error(done, 'not found');
 
-    const user = await User.findById(userId);
+    const user = await User.findById(id);
     if (!user) return error(done, 'not found');
 
     success(done, serializeUser(user));
   }
 
   async onClWebUserUpdateBio({bio}, done) {
-    debug('cl_web_user_update_bio', bio);
+    debug('  onClWebUserUpdateBio', bio);
 
     if (!this.user) return error(done, 'forbidden');
 
@@ -192,7 +184,7 @@ module.exports = class Session {
   }
 
   async onClWebUserUpdatePassword({currentPassword, password}, done) {
-    debug('cl_web_user_update_password', currentPassword, password);
+    debug('  onClWebUserUpdatePassword', currentPassword, password);
 
     if (!this.user) return error(done, 'forbidden');
     const hash = calcPasswordHash(currentPassword, this.user.salt);
@@ -206,11 +198,11 @@ module.exports = class Session {
   }
 
   async onClWebUserUploadAvatar({size, buffer}, done) {
-    debug('cl_web_user_upload_avatar', size, buffer.length);
+    debug('  onClWebUserUploadAvatar', size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
-    if (size > 1048576) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
 
     const hash = calcFileHash(buffer);
     const remotePath = `/imgs/${hash}.jpg`;
@@ -223,20 +215,16 @@ module.exports = class Session {
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
 
-    // if (this.user.avatarPath) {  // delete old avatar (ignore dependents)
-    //   this.server.bucket.file(this.user.avatarPath).delete().catch(emptyHandle);
-    // }
-
-    this.user = await User.findByIdAndUpdate(this.user.id, {$set: {avatarUrl, avatarPath: remotePath}}, {new: true});
+    this.user = await this.updateUser({avatarUrl, avatarPath: remotePath});
     success(done, serializeUser(this.user));
   }
 
   async onClWebMidiUpload({name, size, buffer}, done) {
-    debug('cl_web_midi_upload', name, size, buffer.length);
+    debug('  onClWebMidiUpload', name, size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
-    if (size > 1048576) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
 
     const hash = calcFileHash(buffer);
     const midiFile = MidiParser.parse(buffer);
@@ -253,6 +241,8 @@ module.exports = class Session {
     fs.unlink(localPath, emptyHandle);
 
     midi = await Midi.create({
+      ...createDefaultMidi(),
+
       uploaderId: this.user.id,
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
@@ -261,19 +251,13 @@ module.exports = class Session {
       hash, path: remotePath,
 
       uploadedDate: new Date(),
-
-      touhouAlbumIndex: -1,
-      touhouSongIndex: -1,
-
-      comments: [],
-      records: [],
     });
 
     success(done, {id: midi.id});
   }
 
   async onClWebMidiUpdate(update, done) {
-    debug('cl_web_midi_update', update.id);
+    debug('  onClWebMidiUpdate', update.id);
 
     const {
       id, name, desc, artistName, artistUrl,
@@ -282,6 +266,7 @@ module.exports = class Session {
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
@@ -293,13 +278,12 @@ module.exports = class Session {
       touhouAlbumIndex, touhouSongIndex,
     });
 
-    midi = await Midi.findByIdAndUpdate(id, {$set: update});
-
+    midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeMidi(midi));
   }
 
   async onClWebMidiGet({id}, done) {
-    debug('cl_web_midi_get', id);
+    debug('  onClWebMidiGet', id);
 
     if (!verifyObjectId(id)) return error(done, 'not found');
 
@@ -309,47 +293,3 @@ module.exports = class Session {
     success(done, serializeMidi(midi));
   }
 };
-
-function serializeMidi(midi) {
-  const {
-    id,
-    uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
-    uploadedDate, approvedDate,
-    sourceArtistName, sourceAlbumName, sourceSongName,
-    touhouAlbumIndex, touhouSongIndex,
-    comments, records,
-    trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
-    passCount, failCount,
-    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
-  } = midi;
-  return {
-    id,
-    uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
-    uploadedDate, approvedDate,
-    sourceArtistName, sourceAlbumName, sourceSongName,
-    touhouAlbumIndex, touhouSongIndex,
-    comments, records,
-    trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
-    passCount, failCount,
-    sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
-  };
-}
-
-function serializeUser(user) {
-  const {
-    id,
-    name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
-  } = user;
-  return {
-    id,
-    name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
-  };
-}
