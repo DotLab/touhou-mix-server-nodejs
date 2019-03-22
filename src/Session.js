@@ -15,6 +15,7 @@ const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefi
 const INTENT_WEB = 'web';
 const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
+const USER_LIST_PAGE_LIMIT = 50;
 
 function success(done, data) {
   debug('    success');
@@ -95,6 +96,7 @@ module.exports = class Session {
     this.socket.on('cl_web_user_register_pre', this.onClWebUserRegisterPre.bind(this));
     this.socket.on('cl_web_user_login', this.onClWebUserLogin.bind(this));
     this.socket.on('cl_web_user_get', this.onClWebUserGet.bind(this));
+    this.socket.on('cl_web_user_list', this.onClWebUserList.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
@@ -172,6 +174,20 @@ module.exports = class Session {
     if (!user) return error(done, 'not found');
 
     success(done, serializeUser(user));
+  }
+
+  async onClWebUserList({page}, done) {
+    debug('  onClWebUserList', page);
+
+    if (!(page > 0)) page = 0; // filter null and undefined
+
+    const users = await User.find()
+        .sort('-rank')
+        .skip(page * USER_LIST_PAGE_LIMIT)
+        .limit(USER_LIST_PAGE_LIMIT);
+    if (!users) return error(done, 'not found');
+
+    success(done, users.map((user) => serializeUser(user)));
   }
 
   async onClWebUserUpdateBio({bio}, done) {
