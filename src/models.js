@@ -152,7 +152,7 @@ exports.serializeMidi = function(midi) {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl,
-    uploadedDate, approvedDate,
+    uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
@@ -165,7 +165,7 @@ exports.serializeMidi = function(midi) {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl,
-    uploadedDate, approvedDate,
+    uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
@@ -191,6 +191,7 @@ exports.createDefaultMidi = function() {
     // meta
     uploadedDate: null,
     approvedDate: null,
+    status: 'PENDING',
     // source
     sourceArtistName: '',
     sourceAlbumName: '',
