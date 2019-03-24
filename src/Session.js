@@ -16,6 +16,7 @@ const INTENT_WEB = 'web';
 const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
+const MIDI_LIST_PAGE_LIMIT = 50;
 
 function success(done, data) {
   debug('    success');
@@ -101,6 +102,7 @@ module.exports = class Session {
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
     this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
+    this.socket.on('cl_web_midi_list', this.onClWebMidiList.bind(this));
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
   }
@@ -307,5 +309,36 @@ module.exports = class Session {
     if (!midi) return error(done, 'not found');
 
     success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiList({touhouAlbumIndex, touhouSongIndex, status, sort, page}, done) {
+    touhouAlbumIndex = parseInt(touhouAlbumIndex);
+    touhouSongIndex = parseInt(touhouSongIndex);
+    status = String(status);
+    sort = String(sort || '-approvedDate');
+    page = parseInt(page || 0);
+    debug('  onClWebMidiList', touhouAlbumIndex, touhouSongIndex, status, sort, page);
+
+    const query = {};
+
+    if (touhouAlbumIndex > 0) {
+      query.touhouAlbumIndex = touhouAlbumIndex;
+      if (!isNaN(touhouSongIndex)) {
+        query.touhouSongIndex = touhouSongIndex;
+      }
+    } else if (touhouAlbumIndex === -1) {
+      query.touhouAlbumIndex = -1;
+    }
+
+    if (status !== 'undefined') {
+      query.status = status;
+    }
+
+    const midis = await Midi.find(query)
+        .sort(sort)
+        .skip(MIDI_LIST_PAGE_LIMIT * page)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+
+    success(done, midis.map((midi) => serializeMidi(midi)));
   }
 };

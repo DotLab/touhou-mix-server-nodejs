@@ -90,6 +90,8 @@ exports.Midi = mongoose.model('Midi', {
   // meta
   uploadedDate: Date,
   approvedDate: Date,
+  // status
+  status: String, // PENDING, APPROVED, DEAD
   // source
   sourceArtistName: String,
   sourceAlbumName: String,
