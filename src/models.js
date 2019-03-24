@@ -35,14 +35,14 @@ exports.serializeUser = function(user) {
   const {
     id,
     name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    trialCount, score, combo, accuracy,
+    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
     name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    trialCount, score, combo, accuracy,
+    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };
 };
 
