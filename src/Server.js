@@ -11,16 +11,16 @@ module.exports = class Server {
     this.storage = storage;
     this.tempPath = tempPath;
 
-    this.buketName = 'thmix-static';
+    this.bucketName = 'thmix-static';
     /** @type {import('@google-cloud/storage').Bucket} */
-    this.bucket = storage.bucket(this.buketName);
+    this.bucket = storage.bucket(this.bucketName);
 
     /** @type {Object.<string, Session>} */
     this.sessions = {};
     this.version = VERSION;
 
     io.on('connection', (socket) => {
-      debug('connection', socket.id);
+      debug('onConnection', socket.id);
       this.sessions[socket.id] = new Session(this, socket);
     });
   }
@@ -46,7 +46,11 @@ module.exports = class Server {
     });
   }
 
+  bucketUploadPrivate(file, destination) {
+    return this.bucket.upload(file, {destination});
+  }
+
   bucketGetPublicUrl(path) {
-    return 'https://storage.googleapis.com/' + this.buketName + path;
+    return 'https://storage.googleapis.com/' + this.bucketName + path;
   }
 };

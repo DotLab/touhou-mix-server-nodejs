@@ -13,15 +13,15 @@ script:
     chmod 600 /tmp/web-worker-key;
     eval `ssh-agent`;
     ssh-add /tmp/web-worker-key;
-    ssh web-worker@35.233.171.1 "cd repositories/thmix-sv-nodejs/ && git pull && npm ci && pm2 restart thmix-server";
+    ssh web-worker@35.233.171.1 "cd repositories/touhou-mix-server-nodejs/ && git pull && npm ci && pm2 restart thmix-server";
     kill $SSH_AGENT_PID;
   fi
-- if [ "$BRANCH" == "staging" ]; then
-    echo "staging";
-    openssl aes-256-cbc -K $encrypted_482956e64e81_key -iv $encrypted_482956e64e81_iv -in web-worker-key.enc -out /tmp/web-worker-key -d;
-    chmod 600 /tmp/web-worker-key;
-    eval `ssh-agent`;
-    ssh-add /tmp/web-worker-key;
-    ssh web-worker@35.233.171.1 "cd repositories/thmix-sv-nodejs/ && git pull && npm ci && pm2 restart thmix-server-staging";
-    kill $SSH_AGENT_PID;
-  fi
+# - if [ "$BRANCH" == "staging" ]; then
+#     echo "staging";
+#     openssl aes-256-cbc -K $encrypted_482956e64e81_key -iv $encrypted_482956e64e81_iv -in web-worker-key.enc -out /tmp/web-worker-key -d;
+#     chmod 600 /tmp/web-worker-key;
+#     eval `ssh-agent`;
+#     ssh-add /tmp/web-worker-key;
+#     ssh web-worker@35.233.171.1 "cd repositories/touhou-mix-server-nodejs/ && git pull && npm ci && pm2 restart thmix-server-staging";
+#     kill $SSH_AGENT_PID;
+#   fi
