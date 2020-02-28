@@ -105,6 +105,7 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_list', this.onClWebMidiList.bind(this));
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
+    this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
   }
 
   listenAppClient() {
@@ -298,6 +299,41 @@ module.exports = class Session {
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiUploadCover({id, size, buffer}, done) {
+    debug('  onClWebMidiUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let midi = await Midi.findById(id);
+    if (!midi) return error(done, 'not found');
+    if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const blurRemotePath = `/imgs/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
+    await cover.png().toFile(blurLocalPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    midi = await Midi.findByIdAndUpdate(id, {$set: {
+      coverUrl: this.server.bucketGetPublicUrl(remotePath), coverPath: remotePath,
+      coverBlurUrl: this.server.bucketGetPublicUrl(blurRemotePath), coverBlurPath: blurRemotePath,
+    }}, {new: true});
     success(done, serializeMidi(midi));
   }
 
