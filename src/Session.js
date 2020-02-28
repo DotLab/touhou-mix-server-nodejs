@@ -108,6 +108,7 @@ module.exports = class Session {
   }
 
   listenAppClient() {
+    this.socket.on('cl_app_user_login', this.onClAppUserLogin.bind(this));
   }
 
   async onClWebUserRegisterPre({recaptcha, name, email}, done) {
@@ -340,5 +341,21 @@ module.exports = class Session {
         .limit(MIDI_LIST_PAGE_LIMIT);
 
     success(done, midis.map((midi) => serializeMidi(midi)));
+  }
+
+  async onClAppUserLogin({email, password}, done) {
+    debug('  onClAppUserLogin', email, password);
+
+    const user = await User.findOne({email: email});
+    if (!user) return error(done, 'wrong combination');
+
+    const hash = calcPasswordHash(password, user.salt);
+    if (hash === user.hash) { // matched
+      this.user = user;
+      this.user = await this.updateUser({seenDate: new Date()});
+      return success(done, serializeUser(this.user));
+    }
+
+    error(done, 'wrong combination');
   }
 };
