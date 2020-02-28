@@ -35,14 +35,14 @@ exports.serializeUser = function(user) {
   const {
     id,
     name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    trialCount, score, combo, accuracy,
+    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
     name, joinedDate, seenDate, bio, avatarUrl,
-    playCount, totalScores, maxCombo, accuracy,
-    totalPlayTime, weightedPp, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    trialCount, score, combo, accuracy,
+    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };
 };
 
@@ -87,6 +87,10 @@ exports.Midi = mongoose.model('Midi', {
   path: String,
   artistName: String,
   artistUrl: String,
+  coverPath: String,
+  coverUrl: String,
+  coverBlurPath: String,
+  coverBlurUrl: String,
   // meta
   uploadedDate: Date,
   approvedDate: Date,
@@ -152,6 +156,7 @@ exports.serializeMidi = function(midi) {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
@@ -165,6 +170,7 @@ exports.serializeMidi = function(midi) {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,

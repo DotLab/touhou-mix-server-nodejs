@@ -6,7 +6,7 @@
   "scripts": {
     "start": "cross-env NODE_ENV=production node src/index.js",
     "staging": "cross-env NODE_ENV=staging node src/index.js",
-    "dev": "cross-env GOOGLE_APPLICATION_CREDENTIALS=E:\\MicroVolt-1f6f6676476b.json NODE_ENV=development DEBUG=thmix* nodemon src/index.js",
+    "dev": "cross-env GOOGLE_APPLICATION_CREDENTIALS=E:\\microvolt-0-9011f72502f4.json NODE_ENV=development DEBUG=thmix* nodemon src/index.js",
     "test": "eslint ."
   },
   "author": "Kailang Fu",
@@ -20,8 +20,8 @@
     "express": "^4.16.4",
     "mailgun-js": "^0.22.0",
     "midi-parser-js": "^3.1.7",
-    "mongoose": "^5.4.7",
-    "sharp": "^0.21.3",
+    "mongoose": "^5.9.2",
+    "sharp": "^0.24.1",
     "socket.io": "^2.2.0"
   }
 }
