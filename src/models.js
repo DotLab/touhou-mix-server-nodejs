@@ -281,3 +281,14 @@ exports.Trial = mongoose.model('Trial', {
   goodCount: Number,
   missCount: Number,
 });
+
+exports.Message = mongoose.model('Message', {
+  userId: ObjectId,
+  userName: String,
+  userAvatarUrl: String,
+
+  date: Date,
+  text: String,
+  upCount: Number,
+  downCount: Number,
+});
