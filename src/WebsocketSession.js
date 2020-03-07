@@ -3,6 +3,8 @@ const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser,
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
+const MIDI_LIST_PAGE_LIMIT = 18;
+
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
   hasher.update(password);
@@ -38,6 +40,8 @@ module.exports = class WebsocketSession {
       switch (command) {
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
         case 'ClAppUserLogin': this.clAppUserLogin(id, args); break;
+        case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
+        case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -95,5 +99,41 @@ module.exports = class WebsocketSession {
     }
 
     return this.returnError(id, 'wrong combination');
+  }
+
+  async clAppMidiListQuery(id, {status, query, sort, page}) {
+    status = String(status);
+    query = String(query || '');
+    sort = String(sort || '-uploadedDate');
+    page = parseInt(page || 0);
+    if (page < 0) {
+      page = 0;
+    }
+    debug('  onClWebMidiList', status, sort, page);
+
+    const conditions = {};
+    if (query) {
+      conditions.$text = {$search: query};
+    }
+    if (status !== 'undefined') {
+      conditions.status = status;
+    }
+
+    const midis = await Midi.find(conditions)
+        .sort(sort)
+        .skip(MIDI_LIST_PAGE_LIMIT * page)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+    this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
+  }
+
+  async clAppMidiDownload(id, {hash}) {
+    hash = String(hash);
+    debug('  clAppMidiDownload', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
+
+    const url = await this.server.bucketService.getSignedUrl(midi.path, 1000 * 60 * 5);
+    this.returnSuccess(id, url[0]);
   }
 };

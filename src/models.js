@@ -1,4 +1,5 @@
 // @ts-nocheck
+const debug = require('debug')('thmix:models');
 
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
@@ -76,16 +77,18 @@ exports.createDefaultUser = function() {
   };
 };
 
-exports.Midi = mongoose.model('Midi', {
+const MidiSchema = new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
   uploaderAvatarUrl: String,
 
   name: String,
+  nameEng: String,
   desc: String,
   hash: String,
   path: String,
   artistName: String,
+  artistNameEng: String,
   artistUrl: String,
   coverPath: String,
   coverUrl: String,
@@ -98,8 +101,11 @@ exports.Midi = mongoose.model('Midi', {
   status: String, // PENDING, APPROVED, DEAD
   // source
   sourceArtistName: String,
+  sourceArtistNameEng: String,
   sourceAlbumName: String,
+  sourceAlbumNameEng: String,
   sourceSongName: String,
+  sourceSongNameEng: String,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
@@ -150,6 +156,24 @@ exports.Midi = mongoose.model('Midi', {
   cCutoff: Number,
   dCutoff: Number,
 });
+MidiSchema.index({
+  uploaderName: 'text',
+  name: 'text',
+  nameEng: 'text',
+  desc: 'text',
+  status: 'text',
+  artistName: 'text',
+  artistNameEng: 'text',
+  sourceArtistName: 'text',
+  sourceArtistNameEng: 'text',
+  sourceAlbumName: 'text',
+  sourceAlbumNameEng: 'text',
+  sourceSongName: 'text',
+  sourceSongNameEng: 'text',
+}, {name: 'text_index'});
+const Midi = mongoose.model('Midi', MidiSchema);
+Midi.syncIndexes().catch((e) => debug(e));
+exports.Midi = Midi;
 
 exports.serializeMidi = function(midi) {
   const {
@@ -165,6 +189,7 @@ exports.serializeMidi = function(midi) {
     avgScores, avgMaxCombo, avgAccuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    hash,
   } = midi;
   return {
     id,
@@ -179,6 +204,7 @@ exports.serializeMidi = function(midi) {
     avgScores, avgMaxCombo, avgAccuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    hash,
   };
 };
 
@@ -292,3 +318,14 @@ exports.Message = mongoose.model('Message', {
   upCount: Number,
   downCount: Number,
 });
+
+const TestSchema = new mongoose.Schema({
+  title: String,
+  body: String,
+});
+TestSchema.index({
+  title: 'text',
+  body: 'text',
+});
+const Test = mongoose.model('Test', TestSchema);
+Test.syncIndexes().catch((e) => debug(e));
