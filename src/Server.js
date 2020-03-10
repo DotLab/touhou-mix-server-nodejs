@@ -11,7 +11,7 @@ module.exports = class Server {
     this.storage = storage;
     this.tempPath = tempPath;
 
-    this.bucketName = 'thmix-static';
+    this.bucketName = 'microvolt-bucket-1';
     /** @type {import('@google-cloud/storage').Bucket} */
     this.bucket = storage.bucket(this.bucketName);
 
