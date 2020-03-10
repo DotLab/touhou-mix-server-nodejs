@@ -42,6 +42,7 @@ module.exports = class WebsocketSession {
         case 'ClAppUserLogin': this.clAppUserLogin(id, args); break;
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
+        case 'ClAppPing': this.clAppPing(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -135,5 +136,11 @@ module.exports = class WebsocketSession {
 
     const url = 'https://storage.thmix.org' + midi.path;
     this.returnSuccess(id, url);
+  }
+
+  async clAppPing(id, {time}) {
+    time = parseInt(time);
+    debug('  clAppPing', time);
+    this.returnSuccess(id, time);
   }
 };
