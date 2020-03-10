@@ -133,7 +133,7 @@ module.exports = class WebsocketSession {
     const midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
 
-    const url = await this.server.bucketService.getSignedUrl(midi.path, 1000 * 60 * 5);
-    this.returnSuccess(id, url[0]);
+    const url = 'https://storage.thmix.org' + midi.path;
+    this.returnSuccess(id, url);
   }
 };

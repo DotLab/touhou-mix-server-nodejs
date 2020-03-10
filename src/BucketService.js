@@ -24,7 +24,7 @@ module.exports = class BucketService {
   }
 
   getPublicUrl(path) {
-    return 'https://storage.googleapis.com/' + this.bucketName + path;
+    return 'https://storage.thmix.org/' + this.bucketName + path;
   }
 
   async getSignedUrl(path, age) {

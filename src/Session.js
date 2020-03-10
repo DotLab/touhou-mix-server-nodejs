@@ -261,7 +261,7 @@ module.exports = class Session {
     const localPath = `${this.server.tempPath}/${hash}.mid`;
 
     fs.writeFileSync(localPath, buffer);
-    await this.server.bucketUploadPrivate(localPath, remotePath);
+    await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
 
     midi = await Midi.create({

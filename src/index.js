@@ -104,7 +104,7 @@ const wsServer = new WebSocket.Server({
 });
 
 const BucketService = require('./BucketService');
-const bucketService = new BucketService(storage, tempPath, 'thmix-static');
+const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1');
 
 const WebsocketServer = require('./WebsocketServer');
 new WebsocketServer(wsServer, bucketService);
