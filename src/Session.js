@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
 
 const debug = require('debug')('thmix:Session');
 
@@ -258,11 +260,18 @@ module.exports = class Session {
     if (midi) return success(done, {duplicated: true, id: midi.id});
 
     const remotePath = `/midis/${hash}.mid`;
+    const mp3RemotePath = `/sounds/${hash}.mp3`;
     const localPath = `${this.server.tempPath}/${hash}.mid`;
-
+    const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
+    const url = this.server.bucketGetPublicUrl(mp3RemotePath);
     fs.writeFileSync(localPath, buffer);
+
+    await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
+
+    await this.server.bucketUploadPublic(mp3LocalPath, mp3RemotePath);
+    fs.unlink(mp3LocalPath, emptyHandle);
 
     midi = await Midi.create({
       ...createDefaultMidi(),
@@ -271,6 +280,7 @@ module.exports = class Session {
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
 
+      trackPlayUrl: url,
       name, desc: name,
       hash, path: remotePath,
 
