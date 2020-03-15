@@ -263,7 +263,7 @@ module.exports = class Session {
     const mp3RemotePath = `/sounds/${hash}.mp3`;
     const localPath = `${this.server.tempPath}/${hash}.mid`;
     const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
-    const url = this.server.bucketGetPublicUrl(mp3RemotePath);
+    const mp3Url = this.server.bucketGetPublicUrl(mp3RemotePath);
     fs.writeFileSync(localPath, buffer);
 
     await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
@@ -280,7 +280,8 @@ module.exports = class Session {
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
 
-      trackPlayUrl: url,
+      mp3Url: mp3Url,
+      mp3Path: mp3RemotePath,
       name, desc: name,
       hash, path: remotePath,
 
