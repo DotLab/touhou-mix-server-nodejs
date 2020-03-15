@@ -284,8 +284,9 @@ module.exports = class Session {
     debug('  onClWebMidiUpdate', update.id);
 
     const {
-      id, name, desc, artistName, artistUrl,
-      sourceArtistName, sourceAlbumName, sourceSongName,
+      id, name, nameEng, desc, artistName, artistNameEng, artistUrl,
+      sourceArtistName, sourceArtistNameEng, sourceAlbumName, sourceAlbumNameEng,
+      sourceSongName, sourceSongNameEng,
       touhouAlbumIndex, touhouSongIndex,
     } = update;
 
@@ -297,8 +298,9 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl,
-      sourceArtistName, sourceAlbumName, sourceSongName,
+      name, nameEng, desc, artistName, artistNameEng, artistUrl,
+      sourceArtistName, sourceArtistNameEng, sourceAlbumName, sourceAlbumNameEng,
+      sourceSongName, sourceSongNameEng,
       touhouAlbumIndex, touhouSongIndex,
     });
 
