@@ -110,9 +110,10 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
-    // this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
+    this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
     this.socket.on('cl_web_soundfont_upload', this.onClWebSoundfontUpload.bind(this));
     this.socket.on('cl_web_soundfont_update', this.onClWebSoundfontUpdate.bind(this));
+    this.socket.on('cl_web_soundfont_upload_cover', this.onClWebSoundfontUploadCover.bind(this));
 
 
     this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
@@ -500,6 +501,41 @@ module.exports = class Session {
     success(done, serializeMidi(soundfont));
   }
 
+  async onClWebSoundfontUploadCover({id, size, buffer}, done) {
+    debug('  onClWebSoundfontUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const blurRemotePath = `/imgs/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
+    await cover.png().toFile(blurLocalPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    soundfont = await Soundfont.findByIdAndUpdate(id, {$set: {
+      coverUrl: this.server.bucketGetPublicUrl(remotePath), coverPath: remotePath,
+      coverBlurUrl: this.server.bucketGetPublicUrl(blurRemotePath), coverBlurPath: blurRemotePath,
+    }}, {new: true});
+    success(done, serializeSoundfont(soundfont));
+  }
+
   async onClWebSoundfontGet({id}, done) {
     debug('  onClWebSoundfontGet', id);
 
@@ -509,5 +545,25 @@ module.exports = class Session {
     if (!soundfont) return error(done, 'not found');
 
     success(done, serializeSoundfont(soundfont));
+  }
+
+  async onClWebSoundfontList({status, sort, page}, done) {
+    status = String(status);
+    sort = String(sort || '-approvedDate');
+    page = parseInt(page || 0);
+    debug('  onClWebMidiList', status, sort, page);
+
+    const query = {};
+
+    if (status !== 'undefined') {
+      query.status = status;
+    }
+
+    const soundfonts = await Soundfont.find(query)
+        .sort(sort)
+        .skip(MIDI_LIST_PAGE_LIMIT * page)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+
+    success(done, soundfonts.map((soundfont) => serializeSoundfont(soundfont)));
   }
 };
