@@ -5,7 +5,8 @@ const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi,
+  Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -101,11 +102,19 @@ module.exports = class Session {
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
+
     this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
     this.socket.on('cl_web_midi_list', this.onClWebMidiList.bind(this));
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+
+    this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
+    // this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
+    this.socket.on('cl_web_soundfont_upload', this.onClWebSoundfontUpload.bind(this));
+    this.socket.on('cl_web_soundfont_update', this.onClWebSoundfontUpdate.bind(this));
+
+
     this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
     this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
@@ -429,5 +438,76 @@ module.exports = class Session {
     }
 
     error(done, 'wrong combination');
+  }
+
+
+  async onClWebSoundfontUpload({name, size, buffer}, done) {
+    debug('  onClWebSoundfontUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 50 * MB) return error(done, 'tampering with api');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/soundfonts/${hash}.sf2`;
+    const localPath = `${this.server.tempPath}/${hash}.sf2`;
+
+    let soundfont = await Soundfont.findOne({hash});
+    if (soundfont) return success(done, {duplicated: true, id: soundfont.id});
+
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    soundfont = await Soundfont.create({
+      ...createDefaultSoundfont(),
+
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name, desc: name,
+      hash, path: remotePath,
+
+      uploadedDate: new Date(),
+    });
+
+    success(done, {id: soundfont.id});
+  }
+
+  async onClWebSoundfontUpdate(update, done) {
+    debug('  onClWebSoundfontUpdate', update.id);
+
+    const {
+      id, uploaderId, uploaderName, uploaderAvatarUrl, name,
+      nameEng, desc, hash, path, uploadedDate, status,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      uploaderId, uploaderName, uploaderAvatarUrl, name,
+      nameEng, desc, hash, path, uploadedDate, status,
+    });
+
+    soundfont = await Soundfont.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeMidi(soundfont));
+  }
+
+  async onClWebSoundfontGet({id}, done) {
+    debug('  onClWebSoundfontGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+
+    success(done, serializeSoundfont(soundfont));
   }
 };

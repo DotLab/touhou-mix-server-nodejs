@@ -329,3 +329,48 @@ TestSchema.index({
 });
 const Test = mongoose.model('Test', TestSchema);
 Test.syncIndexes().catch((e) => debug(e));
+
+exports.Soundfont = mongoose.model('Soundfont', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  name: String,
+  nameEng: String,
+  desc: String,
+  hash: String,
+  path: String,
+
+  uploadedDate: Date,
+  status: String, // PENDING, APPROVED, DEAD
+});
+
+exports.serializeSoundfont = function(soundfont) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, name,
+    nameEng, desc, hash, path, uploadedDate, status,
+  } = soundfont;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, nameEng, desc, hash, path, uploadedDate, status,
+  };
+};
+
+exports.createDefaultSoundfont = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    nameEng: '',
+    desc: '',
+    hash: '',
+    path: '',
+
+    uploadedDate: null,
+    status: 'PENDING',
+  };
+};
