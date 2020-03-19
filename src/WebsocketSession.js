@@ -1,5 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
@@ -20,6 +20,8 @@ module.exports = class WebsocketSession {
     this.websocket = websocket;
 
     this.callbackDict = {};
+
+    this.user = null;
 
     websocket.on('message', this.handleRpc.bind(this));
     websocket.on('close', this.closeSession.bind(this));
@@ -43,6 +45,8 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
+        case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
+        case 'ClAppCheckUpdate': this.clAppCheckUpdate(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -142,5 +146,40 @@ module.exports = class WebsocketSession {
     time = parseInt(time);
     debug('  clAppPing', time);
     this.returnSuccess(id, time);
+  }
+
+  async clAppTrialUpload(id, trial) {
+    const {
+      hash,
+      score, combo, accuracy,
+      perfectCount, greatCount, goodCount, badCount, missCount,
+    } = trial;
+    debug('  clAppTrialUpload', hash);
+
+    if (!this.user) return this.returnError(id, 'forbidden');
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
+
+    await Trial.create({
+      userId: this.user._id,
+      midiId: midi._id,
+      date: new Date(),
+
+      score, combo, accuracy,
+      perfectCount, greatCount, goodCount, badCount, missCount,
+    });
+
+    this.returnSuccess(id);
+  }
+
+  async clAppCheckUpdate(id, {build}) {
+    debug('  clAppCheckUpdate', build);
+    this.returnSuccess(id, {
+      android: {build: 84, url: ''},
+      androidBeta: {build: 175, url: ''},
+      androidAlpha: {build: 204, url: ''},
+      ios: {build: 86, url: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483'},
+      iosBeta: {build: 176, url: ''},
+    });
   }
 };

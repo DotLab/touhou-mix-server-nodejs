@@ -293,18 +293,17 @@ exports.Trial = mongoose.model('Trial', {
   midiId: ObjectId,
   date: Date,
 
-  mode: String,
-  history: [{note: Number, tick: Number, delta: Number}],
+  // history: [{note: Number, time: Number, delta: Number}],
 
   // cached
   score: Number,
   combo: Number,
   accuracy: Number,
-  performance: Number,
 
   perfectCount: Number,
   greatCount: Number,
   goodCount: Number,
+  badCount: Number,
   missCount: Number,
 });
 
