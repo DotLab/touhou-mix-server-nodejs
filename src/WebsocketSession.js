@@ -1,6 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, serializeUser, serializeMidi,
-  Soundfont, UserDocAction} = require('./models');
+const {User, Midi, serializeUser, serializeMidi, Soundfont, UserDocAction} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
@@ -12,7 +11,6 @@ const UP = 'up';
 const DOWN = 'down';
 const MIDI = 'midi';
 const SOUNDFONT = 'soundfont';
-
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -52,8 +50,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
-        case 'ClAppUserVoteMidi': this.clAppUserVoteMidi(id, args); break;
-        case 'ClAppUserLoveMidi': this.clAppUserLoveMidi(id, args); break;
+        case 'clAppUserDocAction': this.clAppUserDocAction(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
