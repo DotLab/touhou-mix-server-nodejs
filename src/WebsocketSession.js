@@ -149,6 +149,8 @@ module.exports = class WebsocketSession {
   async clAppTranslate(id, {src, lang}) {
     const projectId = 'YOUR_PROJECT_ID';
     const translate = new Translate({projectId});
+    debug('  clAppTranslate', src, lang);
+
     try {
       const [translation] = await translate.translate(src, lang);
       this.returnSuccess(id, translation);
