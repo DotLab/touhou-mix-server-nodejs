@@ -453,7 +453,6 @@ module.exports = class Session {
     let soundfont = await Soundfont.findOne({hash});
     if (soundfont) return success(done, {duplicated: true, id: soundfont.id});
 
-
     fs.writeFileSync(localPath, buffer);
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
