@@ -5,8 +5,7 @@ const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi,
-  Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
