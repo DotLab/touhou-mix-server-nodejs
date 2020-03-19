@@ -47,6 +47,7 @@ module.exports = class WebsocketSession {
         case 'ClAppPing': this.clAppPing(id, args); break;
         case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
         case 'ClAppCheckUpdate': this.clAppCheckUpdate(id, args); break;
+        case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -181,5 +182,24 @@ module.exports = class WebsocketSession {
       ios: {build: 86, url: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483'},
       iosBeta: {build: 176, url: ''},
     });
+  }
+
+  async clAppMidiRecordList(id, {hash}) {
+    debug('  clAppMidiRecordList', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
+
+    const trials = await Trial.aggregate([
+      {$match: {midiId: midi._id}},
+      {$sort: {score: -1}},
+      {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
+      {$unwind: '$user'},
+      {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
+      {$project: {user: 0}}]).exec();
+
+    this.returnSuccess(id, trials);
   }
 };
