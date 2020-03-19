@@ -114,7 +114,6 @@ module.exports = class Session {
     this.socket.on('cl_web_soundfont_update', this.onClWebSoundfontUpdate.bind(this));
     this.socket.on('cl_web_soundfont_upload_cover', this.onClWebSoundfontUploadCover.bind(this));
 
-
     this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
     this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
@@ -439,7 +438,6 @@ module.exports = class Session {
 
     error(done, 'wrong combination');
   }
-
 
   async onClWebSoundfontUpload({name, size, buffer}, done) {
     debug('  onClWebSoundfontUpload', name, size, buffer.length);
