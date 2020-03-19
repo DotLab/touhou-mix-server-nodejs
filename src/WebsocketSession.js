@@ -1,6 +1,7 @@
 const debug = require('debug')('thmix:WebsocketSession');
 const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
 const crypto = require('crypto');
+const {Translate} = require('@google-cloud/translate').v2;
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
@@ -43,6 +44,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
+        case 'clAppTranslate': this.clAppTranslate(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -142,5 +144,16 @@ module.exports = class WebsocketSession {
     time = parseInt(time);
     debug('  clAppPing', time);
     this.returnSuccess(id, time);
+  }
+
+  async clAppTranslate(id, {src, lang}) {
+    const projectId = 'YOUR_PROJECT_ID';
+    const translate = new Translate({projectId});
+    try {
+      const [translation] = await translate.translate(src, lang);
+      this.returnSuccess(id, translation);
+    } catch (error) {
+      this.returnError(id, 'Invalid language code.');
+    }
   }
 };
