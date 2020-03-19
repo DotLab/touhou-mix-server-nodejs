@@ -1,5 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Trial} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
@@ -43,6 +43,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
+        case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -142,5 +143,34 @@ module.exports = class WebsocketSession {
     time = parseInt(time);
     debug('  clAppPing', time);
     this.returnSuccess(id, time);
+  }
+
+  async ClAppMidiRecordList(id, {hash, page}) {
+    debug('  clAppMidiRecordList', hash, page);
+
+    const skip = MIDI_LIST_PAGE_LIMIT * page;
+    const query = await Midi.aggregate([
+      {$match: {hash: hash}},
+      {
+        $lookup: {
+          from: 'trials',
+          localField: '_id',
+          foreignField: 'midiId',
+          as: 'trialList',
+        },
+      },
+      {
+        $unwind: {path: '$trialList'},
+      },
+      {
+        $replaceWith: '$trialList',
+      },
+      {$sort: {userId: 1}},
+      {$skip: skip},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+    ]).exec();
+
+    if (!query) this.returnError(id, 'not found');
+    this.returnSuccess(id, query);
   }
 };
