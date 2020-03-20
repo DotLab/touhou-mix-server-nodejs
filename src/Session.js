@@ -442,10 +442,10 @@ module.exports = class Session {
 
     try {
       const [translation] = await translate.translate(src, lang);
-      debug(typeof(translation));
-      // await Trans.create({
-      //   src, lang, text: translate,
-      // });
+      debug('here', typeof(translation));
+      await Trans.create({
+        src, lang, text: translation,
+      });
       return success(done, translation);
     } catch (e) {
       debug(e);
