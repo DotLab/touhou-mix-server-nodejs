@@ -190,7 +190,7 @@ module.exports = class Session {
     if (!(page > 0)) page = 0; // filter null and undefined
 
     const users = await User.find()
-        .sort('-rank')
+        .sort('-performance')
         .skip(page * USER_LIST_PAGE_LIMIT)
         .limit(USER_LIST_PAGE_LIMIT);
     if (!users) return error(done, 'not found');
