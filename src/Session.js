@@ -112,7 +112,6 @@ module.exports = class Session {
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
-    this.socket.on('cl_web_get_translation', this.onClWebGetTranslation.bind(this));
   }
 
   listenAppClient() {
@@ -437,6 +436,9 @@ module.exports = class Session {
   async onClWebTranslate({src, lang}, done) {
     debug('  onClWebTranslate', src, lang);
 
+    const text = await Trans.findOne({src, lang}).exec();
+    if (text !== null) return success(done, text);
+
     const projectId = 'scarletea';
     const translate = new Translate({projectId});
 
@@ -451,13 +453,5 @@ module.exports = class Session {
       debug(e);
       return error(done, 'Invalid code');
     }
-  }
-
-  async onClWebGetTranslation({src, lang}, done) {
-    debug('  onClWebGetTranslation', src, lang);
-
-    const text = await Trans.findOne({src, lang}).exec();
-    debug(text);
-    return success(done, text);
   }
 };
