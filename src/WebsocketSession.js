@@ -218,7 +218,8 @@ module.exports = class WebsocketSession {
       {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
       {$unwind: '$user'},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
-      {$project: {user: 0}}]).exec();
+      {$project: {user: 0}},
+      {$sort: {score: -1}}]).exec();
 
     this.returnSuccess(id, trials);
   }
