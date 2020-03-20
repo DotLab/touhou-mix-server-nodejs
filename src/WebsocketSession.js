@@ -1,5 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Trans} = require('./models');
 const crypto = require('crypto');
 const {Translate} = require('@google-cloud/translate').v2;
 
@@ -147,12 +147,18 @@ module.exports = class WebsocketSession {
   }
 
   async clAppTranslate(id, {src, lang}) {
+    const text = await Trans.findOne({src, lang}).exec();
+    if (text !== null) this.returnSuccess(id, text);
+
     const projectId = 'YOUR_PROJECT_ID';
     const translate = new Translate({projectId});
     debug('  clAppTranslate', src, lang);
 
     try {
       const [translation] = await translate.translate(src, lang);
+      await Trans.create({
+        src, lang, text: translation,
+      });
       this.returnSuccess(id, translation);
     } catch (error) {
       this.returnError(id, 'Invalid language code.');

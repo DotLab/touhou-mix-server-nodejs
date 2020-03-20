@@ -329,3 +329,9 @@ TestSchema.index({
 });
 const Test = mongoose.model('Test', TestSchema);
 Test.syncIndexes().catch((e) => debug(e));
+
+exports.Trans = mongoose.model('Trans', {
+  src: String,
+  lang: String,
+  text: String,
+});
