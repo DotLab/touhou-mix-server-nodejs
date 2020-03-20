@@ -268,26 +268,6 @@ exports.createDefaultMidiComment = function() {
   };
 };
 
-exports.createDefaultMidiRecord = function() {
-  return {
-    userId: null,
-    userName: '',
-    userAvatarUrl: '',
-    grade: '',
-    date: null,
-
-    score: 0,
-    combo: 0,
-    accuracy: 0,
-    performance: 0,
-
-    perfectCount: 0,
-    greatCount: 0,
-    goodCount: 0,
-    missCount: 0,
-  };
-};
-
 exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,
   midiId: ObjectId,
@@ -299,6 +279,7 @@ exports.Trial = mongoose.model('Trial', {
   score: Number,
   combo: Number,
   accuracy: Number,
+  performance: Number,
 
   perfectCount: Number,
   greatCount: Number,

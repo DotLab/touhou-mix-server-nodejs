@@ -155,10 +155,28 @@ module.exports = class WebsocketSession {
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
     } = trial;
+    const performance = Math.floor(Math.log(score));
     debug('  clAppTrialUpload', hash);
 
     if (!this.user) return this.returnError(id, 'forbidden');
-    const midi = await Midi.findOne({hash});
+    this.user = await this.updateUser({
+      $inc: {
+        trialCount: 1,
+        passCount: 1,
+        score,
+        combo,
+        performance,
+      },
+      $set: {
+        accuracy,
+      },
+    });
+    const midi = await Midi.findOneAndUpdate({hash}, {
+      $inc: {
+        trialCount: 1,
+        passCount: 1,
+      },
+    });
     if (!midi) return this.returnError(id, 'not found');
 
     await Trial.create({
@@ -166,7 +184,7 @@ module.exports = class WebsocketSession {
       midiId: midi._id,
       date: new Date(),
 
-      score, combo, accuracy,
+      score, combo, accuracy, performance,
       perfectCount, greatCount, goodCount, badCount, missCount,
     });
 
