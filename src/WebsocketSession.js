@@ -48,6 +48,7 @@ module.exports = class WebsocketSession {
         case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
         case 'ClAppCheckUpdate': this.clAppCheckUpdate(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
+        case 'ClAppTranslate': this.clAppTranslate(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -201,5 +202,17 @@ module.exports = class WebsocketSession {
       {$project: {user: 0}}]).exec();
 
     this.returnSuccess(id, trials);
+  }
+
+  async clAppTranslate(id, {src, lang}) {
+    debug('  clAppTranslate', src, lang);
+
+    try {
+      const text = await this.server.translationService.translate(src, lang);
+      return this.returnSuccess(id, text);
+    } catch (e) {
+      debug(e);
+      return this.returnError(id, String(e));
+    }
   }
 };

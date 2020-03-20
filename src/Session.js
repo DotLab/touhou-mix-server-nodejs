@@ -6,7 +6,7 @@ const {Translate} = require('@google-cloud/translate').v2;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Trans} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -436,22 +436,12 @@ module.exports = class Session {
   async onClWebTranslate({src, lang}, done) {
     debug('  onClWebTranslate', src, lang);
 
-    const text = await Trans.findOne({src, lang}).exec();
-    if (text !== null) return success(done, text);
-
-    const projectId = 'scarletea';
-    const translate = new Translate({projectId});
-
     try {
-      const [translation] = await translate.translate(src, lang);
-      debug('here', typeof(translation));
-      await Trans.create({
-        src, lang, text: translation,
-      });
-      return success(done, translation);
+      const text = await this.server.translationService.translate(src, lang);
+      return success(done, text);
     } catch (e) {
       debug(e);
-      return error(done, 'Invalid code');
+      return error(done, String(e));
     }
   }
 };

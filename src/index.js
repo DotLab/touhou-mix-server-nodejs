@@ -72,9 +72,12 @@ if (fs.existsSync(tempPath)) {
 //   fCount: 0,
 // });
 
+const TranslationService = require('./TranslationService');
+const translationService = new TranslationService('microvolt-0');
+
 const io = require('socket.io')(port);
 const Server = require('./Server');
-new Server(io, storage, tempPath);
+new Server(io, storage, tempPath, translationService);
 
 const WebSocket = require('ws');
 
@@ -107,4 +110,4 @@ const BucketService = require('./BucketService');
 const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1');
 
 const WebsocketServer = require('./WebsocketServer');
-new WebsocketServer(wsServer, bucketService);
+new WebsocketServer(wsServer, {bucketService, translationService});

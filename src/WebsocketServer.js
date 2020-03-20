@@ -3,12 +3,15 @@ const WebsocketSession = require('./WebsocketSession');
 const crypto = require('crypto');
 
 module.exports = class WebsocketServer {
-  constructor(wsServer, bucketService) {
+  constructor(wsServer, {bucketService, translationService}) {
     /** @type {import('ws').Server} */
     this.wsServer = wsServer;
 
     /** @type {import('./BucketService')} */
     this.bucketService = bucketService;
+
+    /** @type {import('./TranslationService')} */
+    this.translationService = translationService;
 
     /** @type {Object.<string, WebsocketSession} */
     this.sessionDict = {};
