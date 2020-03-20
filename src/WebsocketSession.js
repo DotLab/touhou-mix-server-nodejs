@@ -147,13 +147,13 @@ module.exports = class WebsocketSession {
   }
 
   async clAppTranslate(id, {src, lang}) {
+    debug('  clAppTranslate', src, lang);
+
     const text = await Trans.findOne({src, lang}).exec();
     if (text !== null) this.returnSuccess(id, text);
 
     const projectId = 'YOUR_PROJECT_ID';
     const translate = new Translate({projectId});
-    debug('  clAppTranslate', src, lang);
-
     try {
       const [translation] = await translate.translate(src, lang);
       await Trans.create({
