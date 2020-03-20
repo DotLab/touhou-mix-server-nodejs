@@ -166,8 +166,6 @@ module.exports = class WebsocketSession {
         score,
         combo,
         performance,
-      },
-      $set: {
         accuracy,
       },
     });
@@ -175,6 +173,10 @@ module.exports = class WebsocketSession {
       $inc: {
         trialCount: 1,
         passCount: 1,
+        score,
+        combo,
+        performance,
+        accuracy,
       },
     });
     if (!midi) return this.returnError(id, 'not found');

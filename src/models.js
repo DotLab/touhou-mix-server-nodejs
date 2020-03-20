@@ -119,24 +119,6 @@ const MidiSchema = new mongoose.Schema({
 
     text: String,
   }],
-  // cached
-  records: [{
-    userId: ObjectId,
-    userName: String,
-    userAvatarUrl: String,
-    grade: String,
-    date: Date,
-
-    score: Number,
-    combo: Number,
-    accuracy: Number,
-    performance: Number,
-
-    perfectCount: Number,
-    greatCount: Number,
-    goodCount: Number,
-    missCount: Number,
-  }],
 
   trialCount: Number,
   upCount: Number,
@@ -146,6 +128,10 @@ const MidiSchema = new mongoose.Schema({
   avgScore: Number,
   avgCombo: Number,
   avgAccuracy: Number,
+
+  score: Number,
+  combo: Number,
+  accuracy: Number,
 
   passCount: Number,
   failCount: Number,
@@ -186,7 +172,8 @@ exports.serializeMidi = function(midi) {
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
     trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
+    // avgScore, avgCombo, avgAccuracy,
+    score, combo, accuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
@@ -201,7 +188,7 @@ exports.serializeMidi = function(midi) {
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
     trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
+    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
@@ -244,6 +231,10 @@ exports.createDefaultMidi = function() {
     avgScore: 0,
     avgCombo: 0,
     avgAccuracy: 0,
+
+    score: 0,
+    combo: 0,
+    accuracy: 0,
 
     passCount: 0,
     failCount: 0,
