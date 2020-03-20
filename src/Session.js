@@ -2,10 +2,11 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
+const {Translate} = require('@google-cloud/translate').v2;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -110,6 +111,7 @@ module.exports = class Session {
     this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
+    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
   }
 
   listenAppClient() {
@@ -429,5 +431,17 @@ module.exports = class Session {
     }
 
     error(done, 'wrong combination');
+  }
+
+  async onClWebTranslate({src, lang}, done) {
+    debug('  onClWebTranslate', src, lang);
+
+    try {
+      const text = await this.server.translationService.translate(src, lang);
+      return success(done, text);
+    } catch (e) {
+      debug(e);
+      return error(done, String(e));
+    }
   }
 };
