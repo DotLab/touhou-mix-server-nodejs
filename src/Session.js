@@ -358,7 +358,7 @@ module.exports = class Session {
     touhouAlbumIndex = parseInt(touhouAlbumIndex);
     touhouSongIndex = parseInt(touhouSongIndex);
     status = String(status);
-    sort = String(sort || '-approvedDate');
+    sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
     debug('  onClWebMidiList', touhouAlbumIndex, touhouSongIndex, status, sort, page);
 
