@@ -454,8 +454,8 @@ module.exports = class Session {
     if (!this.user) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
 
-    let build = await Build.findOne({name});
-    if (build) return success(done, {duplicated: true, id: build.id});
+    let doc = await Build.findOne({name});
+    if (doc) return success(done, {duplicated: true, id: doc.id});
 
     const remotePath = `/builds/${name}`;
     const localPath = `${this.server.tempPath}/${name}`;
@@ -466,24 +466,24 @@ module.exports = class Session {
 
     const tokens = name.split('-');
     const buildName = tokens[0];
-    const b = tokens[1];
-    const version = b.substr(0, b.length - 4);
+    const build = tokens[1];
+    const version = build.substr(0, build.length - 4);
     const nums = version.split('.');
-    const buildNum = nums[nums.length - 1];
+    const buildInt = parseInt(nums[nums.length - 1]);
 
-    build = await Build.create({
+    doc = await Build.create({
       uploaderId: this.user.id,
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
 
       name: buildName, desc: name,
       path: remotePath,
-      build: buildNum, version,
+      build: buildInt, version,
 
       date: new Date(),
     });
 
-    success(done, {id: build.id});
+    success(done, {id: doc.id});
   }
 
   async onClWebBuildUpdate(update, done) {
@@ -496,16 +496,16 @@ module.exports = class Session {
     if (!this.user) return error(done, 'forbidden');
     if (!verifyObjectId(id)) return error(done, 'forbidden');
 
-    let b = await Build.findById(id);
-    if (!b) return error(done, 'not found');
-    if (!b.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    let doc = await Build.findById(id);
+    if (!doc) return error(done, 'not found');
+    if (!doc.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
       build, version, name, desc,
     });
 
-    b = await Build.findByIdAndUpdate(id, {$set: update}, {new: true});
-    success(done, serializeMidi(b));
+    doc = await Build.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeBuild(doc));
   }
 
   async onClWebBuildGet({id}, done) {
