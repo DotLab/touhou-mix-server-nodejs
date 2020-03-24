@@ -15,6 +15,7 @@ exports.User = mongoose.model('User', {
   bio: String,
   avatarUrl: String,
   avatarPath: String,
+  roles: Array,
   // cached
   trialCount: Number,
   score: Number,
@@ -35,13 +36,13 @@ exports.User = mongoose.model('User', {
 exports.serializeUser = function(user) {
   const {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl,
+    name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl,
+    name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };
@@ -59,6 +60,7 @@ exports.createDefaultUser = function() {
     bio: '',
     avatarUrl: '',
     avatarPath: '',
+    roles: [],
     // cached
     trialCount: 0,
     score: 0,
@@ -362,5 +364,65 @@ exports.serializeResource = function(resource) {
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, type, desc, hash, path, url,
     uploadedDate, approvedDate, status, tags,
+  };
+};
+
+exports.Card = mongoose.model('Card', {
+  uploaderId: ObjectId,
+  date: Date,
+  name: String,
+  desc: String,
+
+  // main -------------------------------------------------------------------------
+  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
+  attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
+
+  // parameters -------------------------------------------------------------------------
+  sp_init: {type: Number, required: true},
+  sp_max: {type: Number, required: true},
+
+  haru_init: {type: Number, required: true},
+  haru_max: {type: Number, required: true},
+
+  rei_init: {type: Number, required: true},
+  rei_max: {type: Number, required: true},
+
+  ma_init: {type: Number, required: true},
+  ma_max: {type: Number, required: true},
+});
+
+exports.createDefaultCard = function() {
+  return {
+    // meta
+    rarity: 'n',
+    attribute: 'ma',
+    name: '',
+    desc: '',
+
+    sp_init: 0,
+    sp_max: 0,
+    haru_init: 0,
+    haru_max: 0,
+    rei_init: 0,
+    rei_max: 0,
+    ma_init: 0,
+    ma_max: 0,
+  };
+};
+
+exports.serializeCard = function(card) {
+  const bucketName = 'scarletea';
+  const {
+    id,
+    name, desc, rarity, attribute,
+    sp_init, sp_max, haru_init, haru_max,
+    rei_init, rei_max, ma_init, ma_max,
+  } = card;
+
+  return {
+    id,
+    name, desc, rarity, attribute,
+    sp_init, sp_max, haru_init, haru_max,
+    rei_init, rei_max, ma_init, ma_max,
   };
 };
