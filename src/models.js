@@ -320,12 +320,12 @@ exports.Build = mongoose.model('Build', {
   path: String,
 });
 
-exports.serializeBuild = function(b) {
+exports.serializeBuild = function(doc) {
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     date, build, version, name, desc, path,
-  } = b;
+  } = doc;
   const url = 'https://storage.thmix.org' + path;
   return {
     id,
