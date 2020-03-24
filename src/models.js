@@ -306,3 +306,30 @@ exports.Translation = mongoose.model('Translation', {
   lang: String,
   text: String,
 });
+
+exports.Build = mongoose.model('Build', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  build: Number,
+  version: String,
+  name: String,
+  desc: String,
+  path: String,
+});
+
+exports.serializeBuild = function(b) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path,
+  } = b;
+  const url = 'https://storage.thmix.org' + path;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path, url,
+  };
+};

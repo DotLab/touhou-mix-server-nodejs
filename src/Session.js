@@ -6,7 +6,7 @@ const {Translate} = require('@google-cloud/translate').v2;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -112,6 +112,9 @@ module.exports = class Session {
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
+    this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
+    this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
+    this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
   }
 
   listenAppClient() {
@@ -443,5 +446,76 @@ module.exports = class Session {
       debug(e);
       return error(done, String(e));
     }
+  }
+
+  async onClWebBuildUpload({name, size, buffer}, done) {
+    debug('  onClWebBuildUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+
+    let build = await Build.findOne({name});
+    if (build) return success(done, {duplicated: true, id: build.id});
+
+    const remotePath = `/builds/${name}`;
+    const localPath = `${this.server.tempPath}/${name}`;
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    const tokens = name.split('-');
+    const buildName = tokens[0];
+    const b = tokens[1];
+    const version = b.substr(0, b.length - 4);
+    const nums = version.split('.');
+    const buildNum = nums[nums.length - 1];
+
+    build = await Build.create({
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name: buildName, desc: name,
+      path: remotePath,
+      build: buildNum, version,
+
+      date: new Date(),
+    });
+
+    success(done, {id: build.id});
+  }
+
+  async onClWebBuildUpdate(update, done) {
+    debug('  onClWebBuildUpdate', update.id);
+
+    const {
+      id, build, version, name, desc,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let b = await Build.findById(id);
+    if (!b) return error(done, 'not found');
+    if (!b.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      build, version, name, desc,
+    });
+
+    b = await Build.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeMidi(b));
+  }
+
+  async onClWebBuildGet({id}, done) {
+    debug('  onClWebBuildGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const build = await Build.findById(id);
+    if (!build) return error(done, 'not found');
+
+    success(done, serializeBuild(build));
   }
 };
