@@ -263,6 +263,7 @@ exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
+  version: Number,
 
   // history: [{note: Number, time: Number, delta: Number}],
 

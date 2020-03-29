@@ -191,6 +191,8 @@ module.exports = class WebsocketSession {
 
       score, combo, accuracy, performance,
       perfectCount, greatCount, goodCount, badCount, missCount,
+
+      version,
     });
 
     this.returnSuccess(id);
@@ -227,7 +229,7 @@ module.exports = class WebsocketSession {
     if (!midi) return this.returnError(id, 'not found');
 
     const trials = await Trial.aggregate([
-      {$match: {midiId: midi._id}},
+      {$match: {midiId: midi._id, version: 2}},
       {$sort: {score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
