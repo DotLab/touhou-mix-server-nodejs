@@ -155,10 +155,12 @@ module.exports = class WebsocketSession {
       hash,
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
+      version,
     } = trial;
     const performance = Math.floor(Math.log(score));
-    debug('  clAppTrialUpload', hash);
+    debug('  clAppTrialUpload', version, hash);
 
+    if (version !== 2) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
     this.user = await this.updateUser({
       $inc: {
