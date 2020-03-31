@@ -444,4 +444,14 @@ module.exports = class Session {
       return error(done, String(e));
     }
   }
+
+  checkUserRole(role) {
+    if (!this.user || !this.user.roles || this.user.roles.length == 0) {
+      return false;
+    }
+    if (this.user.roles.includes(role)) {
+      return true;
+    }
+    return false;
+  }
 };
