@@ -1,5 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi, Build, serializeBuild} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
@@ -46,7 +46,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
         case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
-        case 'ClAppCheckUpdate': this.clAppCheckUpdate(id, args); break;
+        case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
         case 'ClAppTranslate': this.clAppTranslate(id, args); break;
       }
@@ -155,10 +155,12 @@ module.exports = class WebsocketSession {
       hash,
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
+      version,
     } = trial;
     const performance = Math.floor(Math.log(score));
-    debug('  clAppTrialUpload', hash);
+    debug('  clAppTrialUpload', version, hash);
 
+    if (version !== 2) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
     this.user = await this.updateUser({
       $inc: {
@@ -189,19 +191,34 @@ module.exports = class WebsocketSession {
 
       score, combo, accuracy, performance,
       perfectCount, greatCount, goodCount, badCount, missCount,
+
+      version,
     });
 
     this.returnSuccess(id);
   }
 
-  async clAppCheckUpdate(id, {build}) {
-    debug('  clAppCheckUpdate', build);
+  async clAppCheckVersion(id, {version}) {
+    debug('  clAppCheckVersion', version);
+
+    let [build] = await Build.find({}).sort('-date').limit(1).lean().exec();
+    build = serializeBuild(build);
+
     this.returnSuccess(id, {
-      android: {build: 84, url: ''},
-      androidBeta: {build: 175, url: ''},
-      androidAlpha: {build: 204, url: ''},
-      ios: {build: 86, url: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483'},
-      iosBeta: {build: 176, url: ''},
+      androidVersion: '2.2.84',
+      androidUrl: 'https://play.google.com/store/apps/details?id=kailang.touhoumix',
+
+      androidBetaVersion: '3.0.0.208',
+      androidBetaUrl: 'https://play.google.com/apps/testing/kailang.touhoumix',
+
+      androidAlphaVersion: build.version,
+      androidAlphaUrl: build.url,
+
+      iosVersion: '2.2.86',
+      iosUrl: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483',
+
+      iosBetaVersion: '3.0.0.176',
+      iosBetaUrl: 'https://testflight.apple.com/join/fM6ung3w',
     });
   }
 
@@ -212,7 +229,7 @@ module.exports = class WebsocketSession {
     if (!midi) return this.returnError(id, 'not found');
 
     const trials = await Trial.aggregate([
-      {$match: {midiId: midi._id}},
+      {$match: {midiId: midi._id, version: 2}},
       {$sort: {score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},

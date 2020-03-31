@@ -265,6 +265,7 @@ exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
+  version: Number,
 
   // history: [{note: Number, time: Number, delta: Number}],
 
@@ -308,3 +309,30 @@ exports.Translation = mongoose.model('Translation', {
   lang: String,
   text: String,
 });
+
+exports.Build = mongoose.model('Build', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  build: Number,
+  version: String,
+  name: String,
+  desc: String,
+  path: String,
+});
+
+exports.serializeBuild = function(doc) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path,
+  } = doc;
+  const url = 'https://storage.thmix.org' + path;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path, url,
+  };
+};
