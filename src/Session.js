@@ -18,6 +18,10 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+const ROLE_MIDI_MOD = 'midi-mod';
+const ROLE_MIDI_ADMIN = 'midi-admin';
+const ROLE_SITE_OWNER = 'site-owner';
+
 
 function success(done, data) {
   debug('    success');
@@ -452,6 +456,7 @@ module.exports = class Session {
     debug('  onClWebBuildUpload', name, size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
 
     let doc = await Build.findOne({name});
@@ -494,6 +499,7 @@ module.exports = class Session {
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
     if (!verifyObjectId(id)) return error(done, 'forbidden');
 
     let doc = await Build.findById(id);
