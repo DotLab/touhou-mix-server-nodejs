@@ -6,7 +6,8 @@ const {Translate} = require('@google-cloud/translate').v2;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
+  Album, serializeAlbum, Song, serializeSong} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -115,6 +116,13 @@ module.exports = class Session {
     this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
     this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
     this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
+    this.socket.on('cl_web_album_create', this.onClWebAlbumCreate.bind(this));
+    this.socket.on('cl_web_album_get', this.onClWebAlbumGet.bind(this));
+    this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
+    this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
+    this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
+    this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
+    this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
   }
 
   listenAppClient() {
@@ -517,5 +525,128 @@ module.exports = class Session {
     if (!build) return error(done, 'not found');
 
     success(done, serializeBuild(build));
+  }
+
+  async onClWebAlbumCreate(done) {
+    const album = await Album.create({
+      name: '',
+      desc: '',
+      date: new Date(),
+      coverPath: null,
+      coverBlurPath: null,
+    });
+    success(done, {id: album.id});
+  }
+
+  async onClWebAlbumGet({id}, done) {
+    debug('  onClWebAlbumGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const album = await Album.findById(id);
+    if (!album) return error(done, 'not found');
+
+    success(done, serializeAlbum(album));
+  }
+
+  async onClWebAlbumUploadCover({id, size, buffer}, done) {
+    debug('  onClWebAlbumUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let album = await Album.findById(id);
+    if (!album) return error(done, 'not found');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const blurRemotePath = `/imgs/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
+    await cover.png().toFile(blurLocalPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    album = await Album.findByIdAndUpdate(id, {$set: {
+      coverPath: remotePath,
+      coverBlurPath: blurRemotePath,
+    }}, {new: true});
+    success(done, serializeAlbum(album));
+  }
+
+  async onClWebAlbumUpdate(update, done) {
+    debug('  onClWebAlbumUpdate', update.id);
+
+    const {
+      id, name, desc,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Album.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      name, desc,
+    });
+
+    doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeAlbum(doc));
+  }
+
+  async onClWebSongCreate(done) {
+    debug('  onClWebSongCreate');
+
+    if (!this.user) return error(done, 'forbidden');
+    const song = await Song.create({
+      albumId: null,
+      composerId: null,
+      name: '',
+      desc: '',
+      track: 0,
+    });
+    success(done, {id: song.id});
+  }
+
+  async onClWebSongGet({id}, done) {
+    debug('  onClWebSongGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const song = await Song.findById(id);
+    if (!song) return error(done, 'not found');
+
+    success(done, serializeSong(song));
+  }
+
+  async onClWebSongUpdate(update, done) {
+    debug('  onClWebSongUpdate', update.id);
+
+    const {
+      id, name, desc, track,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Song.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      name, desc, track,
+    });
+
+    doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeSong(doc));
   }
 };

@@ -106,6 +106,7 @@ const MidiSchema = new mongoose.Schema({
   sourceAlbumNameEng: String,
   sourceSongName: String,
   sourceSongNameEng: String,
+  sourceSongId: ObjectId,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
@@ -334,3 +335,53 @@ exports.serializeBuild = function(doc) {
     date, build, version, name, desc, path, url,
   };
 };
+
+exports.Album = mongoose.model('Album', {
+  name: String,
+  desc: String,
+  date: Date,
+  coverPath: String,
+  coverBlurPath: String,
+});
+
+exports.serializeAlbum = function(doc) {
+  const {
+    id,
+    name, desc, date, coverPath, coverBlurPath,
+  } = doc;
+  const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
+  const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
+
+  return {
+    id,
+    name, desc, date, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+  };
+};
+
+exports.Song = mongoose.model('Song', {
+  albumId: ObjectId,
+  composerId: ObjectId, // Person
+
+  name: String,
+  desc: String,
+  track: Number,
+});
+
+exports.serializeSong = function(doc) {
+  const {
+    id,
+    albumId, composerId, name, desc, track,
+  } = doc;
+
+  return {
+    id,
+    albumId, composerId, name, desc, track,
+  };
+};
+
+exports.Person = mongoose.model('Person', {
+  name: String,
+  url: String,
+  desc: String,
+  avatarPath: String,
+});
