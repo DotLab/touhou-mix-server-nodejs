@@ -41,8 +41,8 @@ const {Album, Song, Midi, Person} = require('../src/models');
       albumIndex: song.albumIndex, track: song.track});
     if (!doc) {
       // New song
-      doc = console.log('new song', song.name);
-      await Song.create({
+      console.log('new song', song.name);
+      doc = await Song.create({
         ...song,
         albumId: albumDoc._id,
         composerId: composerDoc._id,
