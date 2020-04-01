@@ -1,5 +1,5 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi, Build, serializeBuild} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi, Build, serializeBuild, Person} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
@@ -49,6 +49,7 @@ module.exports = class WebsocketSession {
         case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
         case 'ClAppTranslate': this.clAppTranslate(id, args); break;
+        case 'ClAppMidiBundleBuild': this.clAppMidiBundleBuild(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -252,5 +253,52 @@ module.exports = class WebsocketSession {
       debug(e);
       return this.returnError(id, String(e));
     }
+  }
+
+  async clAppMidiBundleBuild(id) {
+    debug('  clAppMidiBundleBuild');
+
+    const midis = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+    ]);
+    const songs = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+      {$group: {_id: '$songId'}},
+      {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song'}},
+      {$replaceRoot: {newRoot: '$song'}},
+    ]);
+    const albums = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+      {$group: {_id: '$songId'}},
+      {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song'}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album'}},
+      {$replaceRoot: {newRoot: '$album'}},
+    ]);
+    const persons = [
+      ...(await Midi.aggregate([
+        {$match: {status: 'INCLUDED'}},
+        {$group: {_id: '$authorId'}},
+        {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
+        {$unwind: {path: '$composer'}},
+        {$replaceRoot: {newRoot: '$composer'}},
+      ])),
+      ...(await Midi.aggregate([
+        {$match: {status: 'INCLUDED'}},
+        {$group: {_id: '$songId'}},
+        {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+        {$unwind: {path: '$song'}},
+        {$group: {_id: '$song.composerId'}},
+        {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
+        {$unwind: {path: '$composer'}},
+        {$replaceRoot: {newRoot: '$composer'}},
+      ])),
+    ];
+
+    return this.returnSuccess(id, {
+      midis, songs, albums, persons,
+    });
   }
 };

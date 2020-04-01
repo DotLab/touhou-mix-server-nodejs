@@ -108,6 +108,7 @@ const MidiSchema = new mongoose.Schema({
   sourceSongNameEng: String,
 
   songId: ObjectId,
+  authorId: ObjectId,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
