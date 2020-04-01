@@ -106,6 +106,7 @@ const MidiSchema = new mongoose.Schema({
   sourceAlbumNameEng: String,
   sourceSongName: String,
   sourceSongNameEng: String,
+  sourceSongId: ObjectId,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
@@ -332,5 +333,76 @@ exports.serializeBuild = function(doc) {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     date, build, version, name, desc, path, url,
+  };
+};
+
+exports.Album = mongoose.model('Album', {
+  name: String,
+  desc: String,
+  date: Date,
+  abbr: String,
+  coverPath: String,
+  coverBlurPath: String,
+});
+
+exports.serializeAlbum = function(doc) {
+  const {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath,
+  } = doc;
+  const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
+  // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
+  const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
+
+  return {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+  };
+};
+
+exports.Song = mongoose.model('Song', {
+  albumId: ObjectId,
+  composerId: ObjectId, // Person
+
+  name: String,
+  desc: String,
+  track: Number,
+});
+
+exports.serializeSong = function(doc) {
+  const {
+    id,
+    albumId, composerId, name, desc, track,
+  } = doc;
+
+  return {
+    id,
+    albumId, composerId, name, desc, track,
+  };
+};
+
+// exports.Person = mongoose.model('Person', {
+
+const PersonSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  desc: String,
+  avatarPath: String,
+}, {collection: 'persons'});
+
+const Person = mongoose.model('Person', PersonSchema);
+exports.Person = Person;
+
+exports.serializePerson = function(doc) {
+  const {
+    id,
+    name, url, desc, avatarPath,
+  } = doc;
+  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
+  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
+
+  return {
+    id,
+    name, url, desc, avatarPath, avatarUrl,
   };
 };
