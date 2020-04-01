@@ -340,6 +340,7 @@ exports.Album = mongoose.model('Album', {
   name: String,
   desc: String,
   date: Date,
+  abbr: String,
   coverPath: String,
   coverBlurPath: String,
 });
@@ -347,7 +348,7 @@ exports.Album = mongoose.model('Album', {
 exports.serializeAlbum = function(doc) {
   const {
     id,
-    name, desc, date, coverPath, coverBlurPath,
+    name, desc, date, abbr, coverPath, coverBlurPath,
   } = doc;
   const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
   // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
@@ -355,7 +356,7 @@ exports.serializeAlbum = function(doc) {
 
   return {
     id,
-    name, desc, date, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+    name, desc, date, abbr, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
   };
 };
 

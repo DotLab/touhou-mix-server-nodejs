@@ -3,6 +3,8 @@ const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 const {Translate} = require('@google-cloud/translate').v2;
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 const debug = require('debug')('thmix:Session');
 
@@ -120,9 +122,11 @@ module.exports = class Session {
     this.socket.on('cl_web_album_get', this.onClWebAlbumGet.bind(this));
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
+    this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
+    this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
@@ -721,5 +725,36 @@ module.exports = class Session {
 
     doc = await Person.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializePerson(doc));
+  }
+
+  async onClWebAlbumList(done) {
+    const sort = String('-date');
+    debug('  onClWebAlbumList');
+
+    const albums = await Album.find({})
+        .sort(sort)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+
+    success(done, albums.map((album) => serializeAlbum(album)));
+  }
+
+  async onClWebSongList({albumId, page}, done) {
+    page = parseInt(page || 0);
+    debug('  onClWebSongList', albumId, page);
+
+    const query = Song.aggregate([
+      {$match: {albumId: new ObjectId(albumId)}},
+      {
+        $lookup: {
+          from: 'persons',
+          let: {'id': 'composerId'},
+          pipeline: [{$project: {'name': 1, '_id': 0}}],
+          as: 'composerName',
+        },
+      },
+    ]);
+
+    const songs = await query.exec();
+    success(done, songs);
   }
 };
