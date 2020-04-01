@@ -106,7 +106,8 @@ const MidiSchema = new mongoose.Schema({
   sourceAlbumNameEng: String,
   sourceSongName: String,
   sourceSongNameEng: String,
-  sourceSongId: ObjectId,
+
+  songId: ObjectId,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
@@ -337,10 +338,12 @@ exports.serializeBuild = function(doc) {
 };
 
 exports.Album = mongoose.model('Album', {
+  index: Number,
   name: String,
   desc: String,
   date: Date,
   abbr: String,
+
   coverPath: String,
   coverBlurPath: String,
 });
@@ -362,6 +365,7 @@ exports.serializeAlbum = function(doc) {
 
 exports.Song = mongoose.model('Song', {
   albumId: ObjectId,
+  albumIndex: Number,
   composerId: ObjectId, // Person
 
   name: String,
