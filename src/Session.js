@@ -7,7 +7,7 @@ const {Translate} = require('@google-cloud/translate').v2;
 const debug = require('debug')('thmix:Session');
 
 const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
-  Album, serializeAlbum, Song, serializeSong} = require('./models');
+  Album, serializeAlbum, Song, serializeSong, Person, serializePerson} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -123,6 +123,10 @@ module.exports = class Session {
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
+    this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
+    this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
+    this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
+    this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
   }
 
   listenAppClient() {
@@ -633,7 +637,7 @@ module.exports = class Session {
     debug('  onClWebSongUpdate', update.id);
 
     const {
-      id, name, desc, track,
+      id, albumId, composerId, name, desc, track,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -643,10 +647,79 @@ module.exports = class Session {
     if (!doc) return error(done, 'not found');
 
     update = filterUndefinedKeys({
-      name, desc, track,
+      albumId, composerId, name, desc, track,
     });
 
     doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeSong(doc));
+  }
+
+  async onClWebPersonCreate(done) {
+    const person = await Person.create({
+      name: '',
+      desc: '',
+      url: '',
+      avatarPath: null,
+    });
+    success(done, {id: person.id});
+  }
+
+  async onClWebPersonGet({id}, done) {
+    debug('  onClWebPersonGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const person = await Person.findById(id);
+    if (!person) return error(done, 'not found');
+
+    success(done, serializePerson(person));
+  }
+
+  async onClWebPersonUploadAvatar({id, size, buffer}, done) {
+    debug('  onClWebPersonUploadAvatar', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let person = await Person.findById(id);
+    if (!person) return error(done, 'not found');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    person = await Person.findByIdAndUpdate(id, {$set: {
+      avatarPath: remotePath,
+    }}, {new: true});
+    success(done, serializePerson(person));
+  }
+
+  async onClWebPersonUpdate(update, done) {
+    debug('  onClWebPersonUpdate', update.id);
+
+    const {
+      id, name, desc, url,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Person.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      name, desc, url,
+    });
+
+    doc = await Person.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializePerson(doc));
   }
 };

@@ -350,6 +350,7 @@ exports.serializeAlbum = function(doc) {
     name, desc, date, coverPath, coverBlurPath,
   } = doc;
   const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
+  // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
   const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
 
   return {
@@ -379,9 +380,28 @@ exports.serializeSong = function(doc) {
   };
 };
 
-exports.Person = mongoose.model('Person', {
+// exports.Person = mongoose.model('Person', {
+
+const PersonSchema = new mongoose.Schema({
   name: String,
   url: String,
   desc: String,
   avatarPath: String,
-});
+}, {collection: 'persons'});
+
+const Person = mongoose.model('Person', PersonSchema);
+exports.Person = Person;
+
+exports.serializePerson = function(doc) {
+  const {
+    id,
+    name, url, desc, avatarPath,
+  } = doc;
+  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
+  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
+
+  return {
+    id,
+    name, url, desc, avatarPath, avatarUrl,
+  };
+};
