@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
+const TRILA_SCORING_VERSION = 3;
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -161,7 +162,7 @@ module.exports = class WebsocketSession {
     const performance = Math.floor(Math.log(score));
     debug('  clAppTrialUpload', version, hash);
 
-    if (version !== 2) return this.returnError(id, 'forbidden');
+    if (version !== TRILA_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
     this.user = await this.updateUser({
       $inc: {
@@ -230,7 +231,7 @@ module.exports = class WebsocketSession {
     if (!midi) return this.returnError(id, 'not found');
 
     const trials = await Trial.aggregate([
-      {$match: {midiId: midi._id, version: 2}},
+      {$match: {midiId: midi._id, version: TRILA_SCORING_VERSION}},
       {$sort: {score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
