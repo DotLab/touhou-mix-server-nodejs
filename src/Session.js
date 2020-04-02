@@ -131,6 +131,7 @@ module.exports = class Session {
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
     this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
+    this.socket.on('cl_web_person_list', this.onClWebPersonList.bind(this));
   }
 
   listenAppClient() {
@@ -305,9 +306,8 @@ module.exports = class Session {
     debug('  onClWebMidiUpdate', update.id);
 
     const {
-      id, name, desc, artistName, artistUrl,
+      id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -318,9 +318,8 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl,
+      name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
@@ -732,8 +731,7 @@ module.exports = class Session {
     debug('  onClWebAlbumList');
 
     const albums = await Album.find({})
-        .sort(sort)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+        .sort(sort);
 
     success(done, albums.map((album) => serializeAlbum(album)));
   }
@@ -756,5 +754,15 @@ module.exports = class Session {
 
     const songs = await query.exec();
     success(done, songs);
+  }
+
+  async onClWebPersonList(done) {
+    const sort = String('-date');
+    debug('  onClWebPersonList');
+
+    const persons = await Person.find({})
+        .sort(sort);
+
+    success(done, persons.map((person) => serializePerson(person)));
   }
 };
