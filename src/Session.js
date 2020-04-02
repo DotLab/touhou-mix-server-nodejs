@@ -280,7 +280,6 @@ module.exports = class Session {
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
 
-
     midi = await Midi.create({
       ...createDefaultMidi(),
 
