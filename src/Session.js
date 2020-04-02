@@ -260,18 +260,26 @@ module.exports = class Session {
     if (midi) return success(done, {duplicated: true, id: midi.id});
 
     const remotePath = `/midis/${hash}.mid`;
-    const mp3RemotePath = `/sounds/${hash}.mp3`;
     const localPath = `${this.server.tempPath}/${hash}.mid`;
-    const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
-    const mp3Url = this.server.bucketGetPublicUrl(mp3RemotePath);
     fs.writeFileSync(localPath, buffer);
 
-    await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
+    let mp3RemotePath = `/sounds/${hash}.mp3`;
+    const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
+    let mp3Url = this.server.bucketGetPublicUrl(mp3RemotePath);
+    try {
+      await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
+      await this.server.bucketUploadPublic(mp3LocalPath, mp3RemotePath);
+      fs.unlink(mp3LocalPath, emptyHandle);
+    } catch (e) {
+      // cannot generate mp3
+      debug('    generate mp3 failed');
+      mp3RemotePath = null;
+      mp3Url = null;
+    }
+
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
 
-    await this.server.bucketUploadPublic(mp3LocalPath, mp3RemotePath);
-    fs.unlink(mp3LocalPath, emptyHandle);
 
     midi = await Midi.create({
       ...createDefaultMidi(),
