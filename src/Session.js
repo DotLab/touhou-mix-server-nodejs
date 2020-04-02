@@ -5,7 +5,7 @@ const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -106,6 +106,10 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+    this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
+    this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
+    this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
+    this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
   }
 
   listenAppClient() {
@@ -377,6 +381,38 @@ module.exports = class Session {
         .limit(MIDI_LIST_PAGE_LIMIT);
 
     success(done, midis.map((midi) => serializeMidi(midi)));
+  }
+
+  async onClWebBoardGetMessages(done) {
+    debug('  onClWebBoardGetMessages');
+    const messages = await Message.find().sort({date: -1}).limit(50).lean().exec();
+    success(done, messages);
+  }
+
+  async onClWebBoardSendMessage({recaptcha, text}, done) {
+    text = String(text);
+    debug('  onClWebBoardSendMessages', text);
+
+    const res = await verifyRecaptcha(recaptcha, this.socketIp);
+    if (res !== true) return error(done, 'invalid recaptcha');
+
+    const message = await Message.create({
+      userId: this.user.id,
+      userName: this.user.name,
+      userAvatarUrl: this.user.avatarUrl,
+      text,
+      date: new Date(),
+    });
+    this.server.sendBoardMessage(message.toObject());
+    success(done);
+  }
+
+  async onClWebBoardRequestMessageUpdate() {
+    this.server.addBoardListener(this);
+  }
+
+  async onClWebBoardStopMessageUpdate() {
+    this.server.removeBoardListener(this);
   }
 
   async onClAppUserLogin({email, password}, done) {

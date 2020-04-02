@@ -19,9 +19,31 @@ module.exports = class Server {
     this.sessions = {};
     this.version = VERSION;
 
+    this.boardListeners = {};
+
     io.on('connection', (socket) => {
       debug('onConnection', socket.id);
       this.sessions[socket.id] = new Session(this, socket);
+    });
+  }
+
+  /**
+   * @param {Session} session
+   */
+  addBoardListener(session) {
+    this.boardListeners[session.socketId] = session;
+  }
+
+  /**
+   * @param {Session} session
+   */
+  removeBoardListener(session) {
+    delete this.boardListeners[session.socketId];
+  }
+
+  sendBoardMessage(message) {
+    Object.values(this.boardListeners).forEach((x) => {
+      x.socket.emit('sv_board_update_message', message);
     });
   }
 
@@ -33,6 +55,7 @@ module.exports = class Server {
       this.sessions[socketId].socket.disconnect();
     } else debug('ending mal-formed session', socketId);
     delete this.sessions[socketId];
+    delete this.boardListeners[socketId];
   }
 
   bucketUploadPublic(file, destination) {
