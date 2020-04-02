@@ -123,14 +123,17 @@ module.exports = class Session {
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
     this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+    this.socket.on('cl_web_album_name', this.onClWebAlbumName.bind(this));
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
     this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+    this.socket.on('cl_web_song_name', this.onClWebSongName.bind(this));
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
     this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
+    this.socket.on('cl_web_person_list', this.onClWebPersonList.bind(this));
   }
 
   listenAppClient() {
@@ -305,9 +308,8 @@ module.exports = class Session {
     debug('  onClWebMidiUpdate', update.id);
 
     const {
-      id, name, desc, artistName, artistUrl,
+      id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -318,9 +320,8 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl,
+      name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
@@ -612,6 +613,14 @@ module.exports = class Session {
     success(done, serializeAlbum(doc));
   }
 
+  async onClWebAlbumName({albumId}, done) {
+    debug('  onClWebAlbumName', albumId);
+    const album = await Album.findById(albumId);
+    if (!album) return error(done, 'not found');
+
+    success(done, album.name);
+  }
+
   async onClWebSongCreate(done) {
     debug('  onClWebSongCreate');
 
@@ -732,8 +741,7 @@ module.exports = class Session {
     debug('  onClWebAlbumList');
 
     const albums = await Album.find({})
-        .sort(sort)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+        .sort(sort);
 
     success(done, albums.map((album) => serializeAlbum(album)));
   }
@@ -756,5 +764,23 @@ module.exports = class Session {
 
     const songs = await query.exec();
     success(done, songs);
+  }
+
+  async onClWebSongName({songId}, done) {
+    debug('  onClWebSongName', songId);
+    const song = await Song.findById(songId);
+    if (!song) return error(done, 'not found');
+
+    success(done, song.name);
+  }
+
+  async onClWebPersonList(done) {
+    const sort = String('-date');
+    debug('  onClWebPersonList');
+
+    const persons = await Person.find({})
+        .sort(sort);
+
+    success(done, persons.map((person) => serializePerson(person)));
   }
 };
