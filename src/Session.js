@@ -573,7 +573,6 @@ module.exports = class Session {
   }
 
   async onClWebAlbumGet({id}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebAlbumGet', id);
 
     if (!verifyObjectId(id)) return error(done, 'not found');
@@ -657,7 +656,6 @@ module.exports = class Session {
   }
 
   async onClWebSongGet({id}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebSongGet', id);
 
     if (!verifyObjectId(id)) return error(done, 'not found');
@@ -702,7 +700,6 @@ module.exports = class Session {
   }
 
   async onClWebPersonGet({id}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebPersonGet', id);
 
     if (!verifyObjectId(id)) return error(done, 'not found');
@@ -764,7 +761,6 @@ module.exports = class Session {
   }
 
   async onClWebAlbumList(done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     const sort = String('-date');
     debug('  onClWebAlbumList');
 
@@ -775,7 +771,6 @@ module.exports = class Session {
   }
 
   async onClWebSongList({albumId, page}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     page = parseInt(page || 0);
     debug('  onClWebSongList', albumId, page);
 
@@ -796,7 +791,6 @@ module.exports = class Session {
   }
 
   async onClWebPersonList(done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     const sort = String('-date');
     debug('  onClWebPersonList');
 
