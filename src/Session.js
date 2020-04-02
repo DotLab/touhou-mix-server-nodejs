@@ -123,12 +123,10 @@ module.exports = class Session {
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
     this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
-    this.socket.on('cl_web_album_name', this.onClWebAlbumName.bind(this));
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
     this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
-    this.socket.on('cl_web_song_name', this.onClWebSongName.bind(this));
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
@@ -613,14 +611,6 @@ module.exports = class Session {
     success(done, serializeAlbum(doc));
   }
 
-  async onClWebAlbumName({albumId}, done) {
-    debug('  onClWebAlbumName', albumId);
-    const album = await Album.findById(albumId);
-    if (!album) return error(done, 'not found');
-
-    success(done, album.name);
-  }
-
   async onClWebSongCreate(done) {
     debug('  onClWebSongCreate');
 
@@ -764,14 +754,6 @@ module.exports = class Session {
 
     const songs = await query.exec();
     success(done, songs);
-  }
-
-  async onClWebSongName({songId}, done) {
-    debug('  onClWebSongName', songId);
-    const song = await Song.findById(songId);
-    if (!song) return error(done, 'not found');
-
-    success(done, song.name);
   }
 
   async onClWebPersonList(done) {
