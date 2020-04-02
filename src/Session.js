@@ -3,10 +3,13 @@ const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 const {Translate} = require('@google-cloud/translate').v2;
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
+  Album, serializeAlbum, Song, serializeSong, Person, serializePerson} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -119,6 +122,20 @@ module.exports = class Session {
     this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
     this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
     this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
+    this.socket.on('cl_web_album_create', this.onClWebAlbumCreate.bind(this));
+    this.socket.on('cl_web_album_get', this.onClWebAlbumGet.bind(this));
+    this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
+    this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
+    this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+    this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
+    this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
+    this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
+    this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+    this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
+    this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
+    this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
+    this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
+    this.socket.on('cl_web_person_list', this.onClWebPersonList.bind(this));
   }
 
   listenAppClient() {
@@ -293,9 +310,8 @@ module.exports = class Session {
     debug('  onClWebMidiUpdate', update.id);
 
     const {
-      id, name, desc, artistName, artistUrl,
+      id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -306,9 +322,8 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl,
+      name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
