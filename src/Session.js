@@ -27,9 +27,9 @@ const ROLE_SITE_OWNER = 'site-owner';
 const ROLE_ROOT = 'root';
 
 const ROLE_PARENT_DICT = {
-  'midi-mod': ROLE_MIDI_ADMIN,
-  'midi-admin': ROLE_SITE_OWNER,
-  'site-owner': ROLE_ROOT,
+  [ROLE_MIDI_MOD]: ROLE_MIDI_ADMIN,
+  [ROLE_MIDI_ADMIN]: ROLE_SITE_OWNER,
+  [ROLE_SITE_OWNER]: ROLE_ROOT,
 };
 
 function success(done, data) {
