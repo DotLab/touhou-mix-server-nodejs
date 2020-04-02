@@ -210,7 +210,7 @@ module.exports = class WebsocketSession {
       androidVersion: '2.2.84',
       androidUrl: 'https://play.google.com/store/apps/details?id=kailang.touhoumix',
 
-      androidBetaVersion: '3.0.0.208',
+      androidBetaVersion: '3.0.0.259',
       androidBetaUrl: 'https://play.google.com/apps/testing/kailang.touhoumix',
 
       androidAlphaVersion: build.version,
@@ -219,7 +219,7 @@ module.exports = class WebsocketSession {
       iosVersion: '2.2.86',
       iosUrl: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483',
 
-      iosBetaVersion: '3.0.0.176',
+      iosBetaVersion: '3.0.258',
       iosBetaUrl: 'https://testflight.apple.com/join/fM6ung3w',
     });
   }
