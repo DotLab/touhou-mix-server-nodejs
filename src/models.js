@@ -413,3 +413,122 @@ exports.serializePerson = function(doc) {
     name, url, desc, avatarPath, avatarUrl,
   };
 };
+
+exports.Soundfont = mongoose.model('Soundfont', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  name: String,
+  nameEng: String,
+  desc: String,
+  hash: String,
+  path: String,
+  coverPath: String,
+  coverUrl: String,
+  coverBlurPath: String,
+  coverBlurUrl: String,
+
+  uploadedDate: Date,
+  status: String, // PENDING, APPROVED, DEAD
+
+  upCount: Number,
+  downCount: Number,
+  loveCount: Number,
+});
+
+exports.serializeSoundfont = function(soundfont) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, name,
+    nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    upCount, downCount, loveCount,
+  } = soundfont;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    upCount, downCount, loveCount,
+  };
+};
+
+exports.createDefaultSoundfont = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    nameEng: '',
+    desc: '',
+    hash: '',
+    path: '',
+
+    uploadedDate: null,
+    status: 'PENDING',
+
+    upCount: 0,
+    downCount: 0,
+    loveCount: 0,
+  };
+};
+
+const ResourceSchema = new mongoose.Schema({
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  name: String,
+  type: String,
+  desc: String,
+  hash: String,
+  path: String,
+
+  uploadedDate: Date,
+  approvedDate: Date,
+  status: String,
+  tags: Array,
+});
+
+ResourceSchema.index({
+  uploaderName: 'text',
+  name: 'text',
+  type: 'text',
+  desc: 'text',
+  status: 'text',
+  uploaderId: 'text',
+}, {name: 'text_index'});
+const Resource = mongoose.model('Resource', ResourceSchema);
+Resource.syncIndexes().catch((e) => debug(e));
+exports.Resource = Resource;
+
+exports.createDefaultResource = function() {
+  return {
+    uploaderId: null,
+
+    // meta
+    approvedDate: null,
+    status: 'PENDING',
+    tags: [],
+  };
+};
+
+exports.serializeResource = function(resource) {
+  const bucketName = 'scarletea';
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, type, desc, hash, path,
+    uploadedDate, approvedDate, status, tags,
+  } = resource;
+  const url = 'https://storage.googleapis.com/' + bucketName + path;
+
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, type, desc, hash, path, url,
+    uploadedDate, approvedDate, status, tags,
+  };
+};
