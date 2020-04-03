@@ -2,10 +2,14 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
+const {Translate} = require('@google-cloud/translate').v2;
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
+  Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -118,6 +122,29 @@ module.exports = class Session {
     this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
+
+    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
+
+    this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
+    this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
+    this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
+
+    this.socket.on('cl_web_album_create', this.onClWebAlbumCreate.bind(this));
+    this.socket.on('cl_web_album_get', this.onClWebAlbumGet.bind(this));
+    this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
+    this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
+    this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+
+    this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
+    this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
+    this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
+    this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+
+    this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
+    this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
+    this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
+    this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
+    this.socket.on('cl_web_person_list', this.onClWebPersonList.bind(this));
   }
 
   listenAppClient() {
@@ -198,7 +225,7 @@ module.exports = class Session {
     if (!(page > 0)) page = 0; // filter null and undefined
 
     const users = await User.find()
-        .sort('-rank')
+        .sort('-performance')
         .skip(page * USER_LIST_PAGE_LIMIT)
         .limit(USER_LIST_PAGE_LIMIT);
     if (!users) return error(done, 'not found');
@@ -292,9 +319,8 @@ module.exports = class Session {
     debug('  onClWebMidiUpdate', update.id);
 
     const {
-      id, name, desc, artistName, artistUrl,
+      id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -305,9 +331,8 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl,
+      name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      touhouAlbumIndex, touhouSongIndex,
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
@@ -364,7 +389,7 @@ module.exports = class Session {
     touhouAlbumIndex = parseInt(touhouAlbumIndex);
     touhouSongIndex = parseInt(touhouSongIndex);
     status = String(status);
-    sort = String(sort || '-approvedDate');
+    sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
     debug('  onClWebMidiList', touhouAlbumIndex, touhouSongIndex, status, sort, page);
 
@@ -437,6 +462,321 @@ module.exports = class Session {
     }
 
     error(done, 'wrong combination');
+  }
+
+  async onClWebTranslate({src, lang}, done) {
+    debug('  onClWebTranslate', src, lang);
+
+    try {
+      const text = await this.server.translationService.translate(src, lang);
+      return success(done, text);
+    } catch (e) {
+      debug(e);
+      return error(done, String(e));
+    }
+  }
+
+  async onClWebBuildUpload({name, size, buffer}, done) {
+    debug('  onClWebBuildUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+
+    let doc = await Build.findOne({name});
+    if (doc) return success(done, {duplicated: true, id: doc.id});
+
+    const remotePath = `/builds/${name}`;
+    const localPath = `${this.server.tempPath}/${name}`;
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    const tokens = name.split('-');
+    const buildName = tokens[0];
+    const build = tokens[1];
+    const version = build.substr(0, build.length - 4);
+    const nums = version.split('.');
+    const buildInt = parseInt(nums[nums.length - 1]);
+
+    doc = await Build.create({
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name: buildName, desc: name,
+      path: remotePath,
+      build: buildInt, version,
+
+      date: new Date(),
+    });
+
+    success(done, {id: doc.id});
+  }
+
+  async onClWebBuildUpdate(update, done) {
+    debug('  onClWebBuildUpdate', update.id);
+
+    const {
+      id, build, version, name, desc,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Build.findById(id);
+    if (!doc) return error(done, 'not found');
+    if (!doc.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      build, version, name, desc,
+    });
+
+    doc = await Build.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeBuild(doc));
+  }
+
+  async onClWebBuildGet({id}, done) {
+    debug('  onClWebBuildGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const build = await Build.findById(id);
+    if (!build) return error(done, 'not found');
+
+    success(done, serializeBuild(build));
+  }
+
+  async onClWebAlbumCreate(done) {
+    const album = await Album.create({
+      name: '',
+      desc: '',
+      date: new Date(),
+      coverPath: null,
+      coverBlurPath: null,
+    });
+    success(done, {id: album.id});
+  }
+
+  async onClWebAlbumGet({id}, done) {
+    debug('  onClWebAlbumGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const album = await Album.findById(id);
+    if (!album) return error(done, 'not found');
+
+    success(done, serializeAlbum(album));
+  }
+
+  async onClWebAlbumUploadCover({id, size, buffer}, done) {
+    debug('  onClWebAlbumUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let album = await Album.findById(id);
+    if (!album) return error(done, 'not found');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const blurRemotePath = `/imgs/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
+    await cover.png().toFile(blurLocalPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    album = await Album.findByIdAndUpdate(id, {$set: {
+      coverPath: remotePath,
+      coverBlurPath: blurRemotePath,
+    }}, {new: true});
+    success(done, serializeAlbum(album));
+  }
+
+  async onClWebAlbumUpdate(update, done) {
+    debug('  onClWebAlbumUpdate', update.id);
+
+    const {
+      id, name, desc,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Album.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      name, desc,
+    });
+
+    doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeAlbum(doc));
+  }
+
+  async onClWebSongCreate(done) {
+    debug('  onClWebSongCreate');
+
+    if (!this.user) return error(done, 'forbidden');
+    const song = await Song.create({
+      albumId: null,
+      composerId: null,
+      name: '',
+      desc: '',
+      track: 0,
+    });
+    success(done, {id: song.id});
+  }
+
+  async onClWebSongGet({id}, done) {
+    debug('  onClWebSongGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const song = await Song.findById(id);
+    if (!song) return error(done, 'not found');
+
+    success(done, serializeSong(song));
+  }
+
+  async onClWebSongUpdate(update, done) {
+    debug('  onClWebSongUpdate', update.id);
+
+    const {
+      id, albumId, composerId, name, desc, track,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Song.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      albumId, composerId, name, desc, track,
+    });
+
+    doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeSong(doc));
+  }
+
+  async onClWebPersonCreate(done) {
+    const person = await Person.create({
+      name: '',
+      desc: '',
+      url: '',
+      avatarPath: null,
+    });
+    success(done, {id: person.id});
+  }
+
+  async onClWebPersonGet({id}, done) {
+    debug('  onClWebPersonGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const person = await Person.findById(id);
+    if (!person) return error(done, 'not found');
+
+    success(done, serializePerson(person));
+  }
+
+  async onClWebPersonUploadAvatar({id, size, buffer}, done) {
+    debug('  onClWebPersonUploadAvatar', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let person = await Person.findById(id);
+    if (!person) return error(done, 'not found');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    person = await Person.findByIdAndUpdate(id, {$set: {
+      avatarPath: remotePath,
+    }}, {new: true});
+    success(done, serializePerson(person));
+  }
+
+  async onClWebPersonUpdate(update, done) {
+    debug('  onClWebPersonUpdate', update.id);
+
+    const {
+      id, name, desc, url,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let doc = await Person.findById(id);
+    if (!doc) return error(done, 'not found');
+
+    update = filterUndefinedKeys({
+      name, desc, url,
+    });
+
+    doc = await Person.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializePerson(doc));
+  }
+
+  async onClWebAlbumList(done) {
+    const sort = String('-date');
+    debug('  onClWebAlbumList');
+
+    const albums = await Album.find({})
+        .sort(sort);
+
+    success(done, albums.map((album) => serializeAlbum(album)));
+  }
+
+  async onClWebSongList({albumId, page}, done) {
+    page = parseInt(page || 0);
+    debug('  onClWebSongList', albumId, page);
+
+    const query = Song.aggregate([
+      {$match: {albumId: new ObjectId(albumId)}},
+      {
+        $lookup: {
+          from: 'persons',
+          let: {'id': 'composerId'},
+          pipeline: [{$project: {'name': 1, '_id': 0}}],
+          as: 'composerName',
+        },
+      },
+    ]);
+
+    const songs = await query.exec();
+    success(done, songs);
+  }
+
+  async onClWebPersonList(done) {
+    const sort = String('-date');
+    debug('  onClWebPersonList');
+
+    const persons = await Person.find({})
+        .sort(sort);
+
+    success(done, persons.map((person) => serializePerson(person)));
   }
 
   async onClWebSoundfontUpload({name, size, buffer}, done) {

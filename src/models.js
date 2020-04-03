@@ -107,6 +107,9 @@ const MidiSchema = new mongoose.Schema({
   sourceSongName: String,
   sourceSongNameEng: String,
 
+  songId: ObjectId,
+  authorId: ObjectId,
+
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
   // comments
@@ -119,24 +122,6 @@ const MidiSchema = new mongoose.Schema({
 
     text: String,
   }],
-  // cached
-  records: [{
-    userId: ObjectId,
-    userName: String,
-    userAvatarUrl: String,
-    grade: String,
-    date: Date,
-
-    score: Number,
-    combo: Number,
-    accuracy: Number,
-    performance: Number,
-
-    perfectCount: Number,
-    greatCount: Number,
-    goodCount: Number,
-    missCount: Number,
-  }],
 
   trialCount: Number,
   upCount: Number,
@@ -146,6 +131,10 @@ const MidiSchema = new mongoose.Schema({
   avgScore: Number,
   avgCombo: Number,
   avgAccuracy: Number,
+
+  score: Number,
+  combo: Number,
+  accuracy: Number,
 
   passCount: Number,
   failCount: Number,
@@ -179,14 +168,15 @@ exports.serializeMidi = function(midi) {
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
+    name, desc, artistName, artistUrl, authorId, songId,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
     trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
+    // avgScore, avgCombo, avgAccuracy,
+    score, combo, accuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
@@ -194,14 +184,14 @@ exports.serializeMidi = function(midi) {
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
+    name, desc, artistName, artistUrl, authorId, songId,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
     trialCount, upCount, downCount, loveCount,
-    avgScores, avgMaxCombo, avgAccuracy,
+    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
@@ -245,6 +235,10 @@ exports.createDefaultMidi = function() {
     avgCombo: 0,
     avgAccuracy: 0,
 
+    score: 0,
+    combo: 0,
+    accuracy: 0,
+
     passCount: 0,
     failCount: 0,
 
@@ -268,33 +262,13 @@ exports.createDefaultMidiComment = function() {
   };
 };
 
-exports.createDefaultMidiRecord = function() {
-  return {
-    userId: null,
-    userName: '',
-    userAvatarUrl: '',
-    grade: '',
-    date: null,
-
-    score: 0,
-    combo: 0,
-    accuracy: 0,
-    performance: 0,
-
-    perfectCount: 0,
-    greatCount: 0,
-    goodCount: 0,
-    missCount: 0,
-  };
-};
-
 exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
+  version: Number,
 
-  mode: String,
-  history: [{note: Number, tick: Number, delta: Number}],
+  // history: [{note: Number, time: Number, delta: Number}],
 
   // cached
   score: Number,
@@ -305,6 +279,7 @@ exports.Trial = mongoose.model('Trial', {
   perfectCount: Number,
   greatCount: Number,
   goodCount: Number,
+  badCount: Number,
   missCount: Number,
 });
 
@@ -329,6 +304,114 @@ TestSchema.index({
 });
 const Test = mongoose.model('Test', TestSchema);
 Test.syncIndexes().catch((e) => debug(e));
+
+exports.Translation = mongoose.model('Translation', {
+  src: String,
+  lang: String,
+  text: String,
+});
+
+exports.Build = mongoose.model('Build', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  build: Number,
+  version: String,
+  name: String,
+  desc: String,
+  path: String,
+});
+
+exports.serializeBuild = function(doc) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path,
+  } = doc;
+  const url = 'https://storage.thmix.org' + path;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path, url,
+  };
+};
+
+exports.Album = mongoose.model('Album', {
+  index: Number,
+  name: String,
+  desc: String,
+  date: Date,
+  abbr: String,
+
+  coverPath: String,
+  coverBlurPath: String,
+});
+
+exports.serializeAlbum = function(doc) {
+  const {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath,
+  } = doc;
+  const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
+  // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
+  const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
+
+  return {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+  };
+};
+
+exports.Song = mongoose.model('Song', {
+  albumId: ObjectId,
+  albumIndex: Number,
+  composerId: ObjectId, // Person
+
+  name: String,
+  desc: String,
+  track: Number,
+});
+
+exports.serializeSong = function(doc) {
+  const {
+    id,
+    albumId, composerId, name, desc, track,
+  } = doc;
+
+  return {
+    id,
+    albumId, composerId, name, desc, track,
+  };
+};
+
+// exports.Person = mongoose.model('Person', {
+
+const PersonSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  desc: String,
+  avatarPath: String,
+}, {collection: 'persons'});
+
+const Person = mongoose.model('Person', PersonSchema);
+exports.Person = Person;
+
+exports.serializePerson = function(doc) {
+  const {
+    id,
+    name, url, desc, avatarPath,
+  } = doc;
+  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
+  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
+
+  return {
+    id,
+    name, url, desc, avatarPath, avatarUrl,
+  };
+};
+
 
 exports.Soundfont = mongoose.model('Soundfont', {
   uploaderId: ObjectId,
