@@ -396,10 +396,17 @@ module.exports = class Session {
 
     if (!verifyObjectId(id)) return error(done, 'not found');
 
-    const midi = await Midi.findById(id);
-    if (!midi) return error(done, 'not found');
-
-    success(done, serializeMidi(midi));
+    // const midi = await Midi.findById(id);
+    // if (!midi) return error(done, 'not found');
+    const query = Midi.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song'}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album'}},
+    ]);
+    const midi = await query.exec();
+    success(done, serializeMidi(midi[0]));
   }
 
   async onClWebMidiList({touhouAlbumIndex, touhouSongIndex, status, sort, page}, done) {
@@ -794,20 +801,8 @@ module.exports = class Session {
     page = parseInt(page || 0);
     debug('  onClWebSongList', albumId, page);
 
-    const query = Song.aggregate([
-      {$match: {albumId: new ObjectId(albumId)}},
-      {
-        $lookup: {
-          from: 'persons',
-          let: {'id': 'composerId'},
-          pipeline: [{$project: {'name': 1, '_id': 0}}],
-          as: 'composerName',
-        },
-      },
-    ]);
-
-    const songs = await query.exec();
-    success(done, songs);
+    const songs = await Song.find({albumId: albumId});
+    success(done, songs.map((song) => serializeSong(song)));
   }
 
   async onClWebPersonList(done) {
