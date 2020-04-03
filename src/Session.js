@@ -9,7 +9,7 @@ const ObjectId = mongoose.Types.ObjectId;
 const debug = require('debug')('thmix:Session');
 
 const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
-  Album, serializeAlbum, Song, serializeSong, Person, serializePerson} = require('./models');
+  Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -105,28 +105,41 @@ module.exports = class Session {
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
+
     this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
     this.socket.on('cl_web_midi_list', this.onClWebMidiList.bind(this));
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+
+    this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
+    this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
+    this.socket.on('cl_web_soundfont_upload', this.onClWebSoundfontUpload.bind(this));
+    this.socket.on('cl_web_soundfont_update', this.onClWebSoundfontUpdate.bind(this));
+    this.socket.on('cl_web_soundfont_upload_cover', this.onClWebSoundfontUploadCover.bind(this));
+
     this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
     this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
+
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
+
     this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
     this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
     this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
+
     this.socket.on('cl_web_album_create', this.onClWebAlbumCreate.bind(this));
     this.socket.on('cl_web_album_get', this.onClWebAlbumGet.bind(this));
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
     this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
     this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
@@ -764,5 +777,129 @@ module.exports = class Session {
         .sort(sort);
 
     success(done, persons.map((person) => serializePerson(person)));
+  }
+
+  async onClWebSoundfontUpload({name, size, buffer}, done) {
+    debug('  onClWebSoundfontUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 50 * MB) return error(done, 'tampering with api');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/soundfonts/${hash}.sf2`;
+    const localPath = `${this.server.tempPath}/${hash}.sf2`;
+
+    let soundfont = await Soundfont.findOne({hash});
+    if (soundfont) return success(done, {duplicated: true, id: soundfont.id});
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    soundfont = await Soundfont.create({
+      ...createDefaultSoundfont(),
+
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name, desc: name,
+      hash, path: remotePath,
+
+      uploadedDate: new Date(),
+    });
+
+    success(done, {id: soundfont.id});
+  }
+
+  async onClWebSoundfontUpdate(update, done) {
+    debug('  onClWebSoundfontUpdate', update.id);
+
+    const {
+      id, uploaderId, uploaderName, uploaderAvatarUrl, name,
+      nameEng, desc, hash, path, uploadedDate, status,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      uploaderId, uploaderName, uploaderAvatarUrl, name,
+      nameEng, desc, hash, path, uploadedDate, status,
+    });
+
+    soundfont = await Soundfont.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeMidi(soundfont));
+  }
+
+  async onClWebSoundfontUploadCover({id, size, buffer}, done) {
+    debug('  onClWebSoundfontUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'tampering with api');
+
+    let soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    const hash = calcFileHash(buffer);
+    const remotePath = `/imgs/${hash}.jpg`;
+    const blurRemotePath = `/imgs/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.jpg`;
+    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
+
+    const cover = sharp(buffer).resize(256, 256);
+    await cover.jpeg({quality: 80}).toFile(localPath);
+    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
+    await cover.png().toFile(blurLocalPath);
+
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    soundfont = await Soundfont.findByIdAndUpdate(id, {$set: {
+      coverUrl: this.server.bucketGetPublicUrl(remotePath), coverPath: remotePath,
+      coverBlurUrl: this.server.bucketGetPublicUrl(blurRemotePath), coverBlurPath: blurRemotePath,
+    }}, {new: true});
+    success(done, serializeSoundfont(soundfont));
+  }
+
+  async onClWebSoundfontGet({id}, done) {
+    debug('  onClWebSoundfontGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const soundfont = await Soundfont.findById(id);
+    if (!soundfont) return error(done, 'not found');
+
+    success(done, serializeSoundfont(soundfont));
+  }
+
+  async onClWebSoundfontList({status, sort, page}, done) {
+    status = String(status);
+    sort = String(sort || '-approvedDate');
+    page = parseInt(page || 0);
+    debug('  onClWebMidiList', status, sort, page);
+
+    const query = {};
+
+    if (status !== 'undefined') {
+      query.status = status;
+    }
+
+    const soundfonts = await Soundfont.find(query)
+        .sort(sort)
+        .skip(MIDI_LIST_PAGE_LIMIT * page)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+
+    success(done, soundfonts.map((soundfont) => serializeSoundfont(soundfont)));
   }
 };
