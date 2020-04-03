@@ -392,17 +392,13 @@ module.exports = class Session {
           let: {'songId': '$songId'},
           pipeline: [
             {$match: {'$expr': {'$eq': ['$$songId', '$_id']}}},
-            {$project: {'_id': 1}},
+            {$project: {'albumId': 1, '_id': 0}},
           ],
           as: 'albumId',
         },
       },
     ]);
-    // const midi = await Midi.findById(id);
     const midi = await query.exec();
-    console.log(midi);
-    console.log(serializeMidi(midi[0]));
-
     if (!midi) return error(done, 'not found');
 
     success(done, serializeMidi(midi[0]));
