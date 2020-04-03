@@ -412,7 +412,6 @@ exports.serializePerson = function(doc) {
   };
 };
 
-
 exports.Soundfont = mongoose.model('Soundfont', {
   uploaderId: ObjectId,
   uploaderName: String,
