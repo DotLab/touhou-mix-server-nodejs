@@ -107,6 +107,9 @@ const MidiSchema = new mongoose.Schema({
   sourceSongName: String,
   sourceSongNameEng: String,
 
+  songId: ObjectId,
+  authorId: ObjectId,
+
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
   // comments
@@ -165,7 +168,7 @@ exports.serializeMidi = function(midi) {
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
+    name, desc, artistName, artistUrl, authorId, songId,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
@@ -181,7 +184,7 @@ exports.serializeMidi = function(midi) {
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
+    name, desc, artistName, artistUrl, authorId, songId,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
@@ -263,6 +266,7 @@ exports.Trial = mongoose.model('Trial', {
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
+  version: Number,
 
   // history: [{note: Number, time: Number, delta: Number}],
 
@@ -306,6 +310,168 @@ exports.Translation = mongoose.model('Translation', {
   lang: String,
   text: String,
 });
+
+exports.Build = mongoose.model('Build', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  build: Number,
+  version: String,
+  name: String,
+  desc: String,
+  path: String,
+});
+
+exports.serializeBuild = function(doc) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path,
+  } = doc;
+  const url = 'https://storage.thmix.org' + path;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path, url,
+  };
+};
+
+exports.Album = mongoose.model('Album', {
+  index: Number,
+  name: String,
+  desc: String,
+  date: Date,
+  abbr: String,
+
+  coverPath: String,
+  coverBlurPath: String,
+});
+
+exports.serializeAlbum = function(doc) {
+  const {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath,
+  } = doc;
+  const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
+  // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
+  const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
+
+  return {
+    id,
+    name, desc, date, abbr, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+  };
+};
+
+exports.Song = mongoose.model('Song', {
+  albumId: ObjectId,
+  albumIndex: Number,
+  composerId: ObjectId, // Person
+
+  name: String,
+  desc: String,
+  track: Number,
+});
+
+exports.serializeSong = function(doc) {
+  const {
+    id,
+    albumId, composerId, name, desc, track,
+  } = doc;
+
+  return {
+    id,
+    albumId, composerId, name, desc, track,
+  };
+};
+
+// exports.Person = mongoose.model('Person', {
+
+const PersonSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  desc: String,
+  avatarPath: String,
+}, {collection: 'persons'});
+
+const Person = mongoose.model('Person', PersonSchema);
+exports.Person = Person;
+
+exports.serializePerson = function(doc) {
+  const {
+    id,
+    name, url, desc, avatarPath,
+  } = doc;
+  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
+  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
+
+  return {
+    id,
+    name, url, desc, avatarPath, avatarUrl,
+  };
+};
+
+exports.Soundfont = mongoose.model('Soundfont', {
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  name: String,
+  nameEng: String,
+  desc: String,
+  hash: String,
+  path: String,
+  coverPath: String,
+  coverUrl: String,
+  coverBlurPath: String,
+  coverBlurUrl: String,
+
+  uploadedDate: Date,
+  status: String, // PENDING, APPROVED, DEAD
+
+  upCount: Number,
+  downCount: Number,
+  loveCount: Number,
+});
+
+exports.serializeSoundfont = function(soundfont) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, name,
+    nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    upCount, downCount, loveCount,
+  } = soundfont;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    upCount, downCount, loveCount,
+  };
+};
+
+exports.createDefaultSoundfont = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    nameEng: '',
+    desc: '',
+    hash: '',
+    path: '',
+
+    uploadedDate: null,
+    status: 'PENDING',
+
+    upCount: 0,
+    downCount: 0,
+    loveCount: 0,
+  };
+};
 
 const ResourceSchema = new mongoose.Schema({
   uploaderId: ObjectId,
