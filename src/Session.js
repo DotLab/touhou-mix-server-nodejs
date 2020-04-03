@@ -22,6 +22,15 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+const ROLE_MIDI_MOD = 'midi-mod';
+const ROLE_MIDI_ADMIN = 'midi-admin';
+const ROLE_SITE_OWNER = 'site-owner';
+const ROLE_ROOT = 'root';
+const ROLE_PARENT_DICT = {
+  [ROLE_MIDI_MOD]: ROLE_MIDI_ADMIN,
+  [ROLE_MIDI_ADMIN]: ROLE_SITE_OWNER,
+  [ROLE_SITE_OWNER]: ROLE_ROOT,
+};
 const IMAGE = 'image';
 const SOUND = 'sound';
 
@@ -336,7 +345,7 @@ module.exports = class Session {
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
-    if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!midi.uploaderId.equals(this.user.id) || !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId,
@@ -488,6 +497,7 @@ module.exports = class Session {
     debug('  onClWebBuildUpload', name, size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
 
     let doc = await Build.findOne({name});
@@ -530,6 +540,7 @@ module.exports = class Session {
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
     if (!verifyObjectId(id)) return error(done, 'forbidden');
 
     let doc = await Build.findById(id);
@@ -555,7 +566,22 @@ module.exports = class Session {
     success(done, serializeBuild(build));
   }
 
+  checkUserRole(role) {
+    if (!this.user || !this.user.roles || this.user.roles.length == 0) {
+      return false;
+    }
+    if (this.user.roles.includes(role)) {
+      return true;
+    }
+    while (ROLE_PARENT_DICT[role]) {
+      role = ROLE_PARENT_DICT[role];
+      if (this.user.roles.includes(role)) return true;
+    }
+    return false;
+  }
+
   async onClWebAlbumCreate(done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     const album = await Album.create({
       name: '',
       desc: '',
@@ -578,6 +604,7 @@ module.exports = class Session {
   }
 
   async onClWebAlbumUploadCover({id, size, buffer}, done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebAlbumUploadCover', id, size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
@@ -612,6 +639,7 @@ module.exports = class Session {
   }
 
   async onClWebAlbumUpdate(update, done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebAlbumUpdate', update.id);
 
     const {
@@ -633,6 +661,7 @@ module.exports = class Session {
   }
 
   async onClWebSongCreate(done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebSongCreate');
 
     if (!this.user) return error(done, 'forbidden');
@@ -658,6 +687,7 @@ module.exports = class Session {
   }
 
   async onClWebSongUpdate(update, done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebSongUpdate', update.id);
 
     const {
@@ -679,6 +709,7 @@ module.exports = class Session {
   }
 
   async onClWebPersonCreate(done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     const person = await Person.create({
       name: '',
       desc: '',
@@ -700,6 +731,7 @@ module.exports = class Session {
   }
 
   async onClWebPersonUploadAvatar({id, size, buffer}, done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebPersonUploadAvatar', id, size, buffer.length);
 
     if (!this.user) return error(done, 'forbidden');
@@ -727,6 +759,7 @@ module.exports = class Session {
   }
 
   async onClWebPersonUpdate(update, done) {
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
     debug('  onClWebPersonUpdate', update.id);
 
     const {

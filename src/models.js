@@ -15,6 +15,7 @@ exports.User = mongoose.model('User', {
   bio: String,
   avatarUrl: String,
   avatarPath: String,
+  roles: Array,
   // cached
   trialCount: Number,
   score: Number,
@@ -35,13 +36,13 @@ exports.User = mongoose.model('User', {
 exports.serializeUser = function(user) {
   const {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl,
+    name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl,
+    name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };
@@ -59,6 +60,7 @@ exports.createDefaultUser = function() {
     bio: '',
     avatarUrl: '',
     avatarPath: '',
+    roles: [],
     // cached
     trialCount: 0,
     score: 0,
