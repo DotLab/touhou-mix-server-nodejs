@@ -170,7 +170,7 @@ exports.serializeMidi = function(midi) {
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl, mp3Url,
-    name, desc, artistName, artistUrl, authorId, songId, albumId,
+    name, desc, artistName, artistUrl, authorId, songId,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
@@ -183,6 +183,8 @@ exports.serializeMidi = function(midi) {
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
   } = midi;
+  const albumId = midi.albumId ? midi.albumId[0].albumId : null;
+
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl, mp3Url,
