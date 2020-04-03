@@ -9,7 +9,8 @@ const ObjectId = mongoose.Types.ObjectId;
 const debug = require('debug')('thmix:Session');
 
 const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
-  Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont} = require('./models');
+  Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont,
+  Resource, createDefaultResource, serializeResource} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -21,6 +22,8 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+const IMAGE = 'image';
+const SOUND = 'sound';
 
 function success(done, data) {
   debug('    success');
@@ -145,6 +148,11 @@ module.exports = class Session {
     this.socket.on('cl_web_person_update', this.onClWebPersonUpdate.bind(this));
     this.socket.on('cl_web_person_upload_avatar', this.onClWebPersonUploadAvatar.bind(this));
     this.socket.on('cl_web_person_list', this.onClWebPersonList.bind(this));
+
+    this.socket.on('cl_web_resource_get', this.onClWebResourceGet.bind(this));
+    this.socket.on('cl_web_resource_list', this.onClWebResourceList.bind(this));
+    this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
+    this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
   }
 
   listenAppClient() {
@@ -901,5 +909,106 @@ module.exports = class Session {
         .limit(MIDI_LIST_PAGE_LIMIT);
 
     success(done, soundfonts.map((soundfont) => serializeSoundfont(soundfont)));
+  }
+
+  async onClWebResourceGet({id}, done) {
+    debug('  onClWebResourceGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const resource = await Resource.findById(id);
+    if (!resource) return error(done, 'not found');
+
+    success(done, serializeResource(resource));
+  }
+
+  async onClWebResourceList({type, status, sort, page}, done) {
+    status = String(status);
+    sort = String(sort || '-approvedDate');
+    page = parseInt(page || 0);
+    debug('  onClWebResourceList', type, status, sort, page);
+
+    const query = {};
+    if (type) {
+      query.type = type;
+    }
+    if (status !== 'undefined') {
+      query.status = status;
+    }
+    debug(query, type, status);
+
+    const resources = await Resource.find(query)
+        .sort(sort)
+        .skip(MIDI_LIST_PAGE_LIMIT * page)
+        .limit(MIDI_LIST_PAGE_LIMIT);
+    debug(resources);
+    success(done, resources.map((resource) => serializeResource(resource)));
+  }
+
+  async onClWebResourceUpload({name, size, buffer}, done) {
+    debug('  onClWebResourceUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 1000 * MB) return error(done, 'tampering with api');
+
+    const hash = calcFileHash(buffer);
+
+    let remotePath;
+    let localPath;
+    let type;
+    let resource = await Resource.findOne({hash});
+    if (resource) return success(done, {duplicated: true, id: resource.id});
+
+    if (name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.jpg')) {
+      remotePath = `/resources/img/${hash}.png`;
+      localPath = `${this.server.tempPath}/${hash}.png`;
+      type = IMAGE;
+    } else {
+      remotePath = `/resources/sound/${hash}.ogg`;
+      localPath = `${this.server.tempPath}/${hash}.ogg`;
+      type = SOUND;
+    }
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    resource = await Resource.create({
+      ...createDefaultResource(),
+
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      name, type, desc: name,
+      hash, path: remotePath,
+
+      uploadedDate: new Date(),
+    });
+
+    success(done, {id: resource.id});
+  }
+
+  async onClWebResourceUpdate(update, done) {
+    debug('  onClWebResourceUpdate', update.id);
+
+    const {
+      id, name, desc,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let resource = await Resource.findById(id);
+    if (!resource) return error(done, 'not found');
+    if (!resource.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      name, desc,
+    });
+
+    resource = await Resource.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeResource(resource));
   }
 };
