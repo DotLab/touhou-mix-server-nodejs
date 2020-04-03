@@ -345,7 +345,7 @@ module.exports = class Session {
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
-    if (!midi.uploaderId.equals(this.user.id) || !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
+    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
 
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId,
