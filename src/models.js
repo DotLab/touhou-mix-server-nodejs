@@ -285,6 +285,19 @@ exports.Trial = mongoose.model('Trial', {
   missCount: Number,
 });
 
+exports.serializeTrial = function(trial) {
+  const {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+  } = trial;
+  return {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+  };
+};
+
 exports.Message = mongoose.model('Message', {
   userId: ObjectId,
   userName: String,
@@ -531,4 +544,12 @@ exports.serializeResource = function(resource) {
     name, type, desc, hash, path, url,
     uploadedDate, approvedDate, status, tags,
   };
+};
+
+exports.serializePlay = function(play) {
+  const {_id, count, midi, song, composer} = play;
+
+  const coverUrl = midi.coverPath ? 'https://storage.thmix.org' + midi.coverPath : null;
+  // const coverUrl = midi.coverPath ? 'https://storage.cloud.google.com/scarletea' + midi.coverPath : null;
+  return {_id, count, midi, song, composer, coverUrl};
 };
