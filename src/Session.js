@@ -455,39 +455,33 @@ module.exports = class Session {
     success(done, serializeMidi(midi[0]));
   }
 
-  async onClWebMidiList({touhouAlbumIndex, touhouSongIndex, status, sort, page}, done) {
-    touhouAlbumIndex = parseInt(touhouAlbumIndex);
-    touhouSongIndex = parseInt(touhouSongIndex);
+  async onClWebMidiList({albumId, songId, status, sort, page}, done) {
     status = String(status);
     sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
-    debug('  onClWebMidiList', touhouAlbumIndex, touhouSongIndex, status, sort, page);
+    debug('  onClWebMidiList', albumId, songId, status, sort, page);
 
     const query = {};
-
-    if (touhouAlbumIndex > 0) {
-      query.touhouAlbumIndex = touhouAlbumIndex;
-      if (!isNaN(touhouSongIndex)) {
-        query.touhouSongIndex = touhouSongIndex;
-      }
-    } else if (touhouAlbumIndex === -1) {
-      query.touhouAlbumIndex = -1;
-    }
 
     if (status !== 'undefined') {
       query.status = status;
     }
 
-    const midis = await Midi.aggregate([
+    const songQuery = {};
+    if (albumId) {
+      songQuery.albumId = new ObjectId(albumId);
+    }
+    if (songId) {
+      songQuery._id = new ObjectId(songId);
+    }
+
+    const midis = await Song.aggregate([
+      {$match: songQuery},
+      {$lookup: {from: 'midis', localField: '_id', foreignField: 'songId', as: 'midi'}},
+      {$unwind: {path: '$midi'}},
+      {$replaceRoot: {newRoot: '$midi'}},
       {$match: query},
-      {$sort: {uploadedDate: -1}},
-      {$skip: MIDI_LIST_PAGE_LIMIT * page},
-      {$limit: MIDI_LIST_PAGE_LIMIT},
-      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
-    ]);
+    ]).exec();
 
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
@@ -968,7 +962,7 @@ module.exports = class Session {
     status = String(status);
     sort = String(sort || '-approvedDate');
     page = parseInt(page || 0);
-    debug('  onClWebMidiList', status, sort, page);
+    debug('  onClWebSoundfontList', status, sort, page);
 
     const query = {};
 
