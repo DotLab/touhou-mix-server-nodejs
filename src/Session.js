@@ -17,6 +17,7 @@ const {
   Person, serializePerson,
   Soundfont, createDefaultSoundfont, serializeSoundfont,
   Resource, createDefaultResource, serializeResource,
+  Trial,
 } = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
@@ -40,6 +41,7 @@ const ROLE_PARENT_DICT = {
 };
 const IMAGE = 'image';
 const SOUND = 'sound';
+const TRIAL_SCORING_VERSION = 3;
 
 function success(done, data) {
   debug('    success');
@@ -182,6 +184,7 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+    this.socket.on('cl_web_midi_record_list', this.onClWebMidiRecordList.bind(this));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
@@ -435,6 +438,26 @@ module.exports = class Session {
     }}, {new: true});
 
     success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiRecordList({id}, done) {
+    debug('  onClWebMidiRecordList', id);
+
+    const midi = await Midi.findOne({_id: new ObjectId(id)});
+    if (!midi) return error(done, 'not found');
+
+    const trials = await Trial.aggregate([
+      {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
+      {$sort: {score: -1}},
+      {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
+      {$unwind: '$user'},
+      {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
+      {$project: {user: 0}},
+      {$sort: {score: -1}}]).exec();
+
+    return success(done, trials);
   }
 
   async onClWebMidiGet({id}, done) {
