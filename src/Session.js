@@ -1136,7 +1136,7 @@ module.exports = class Session {
     if (!this.user) return error(done, 'forbidden');
     const id = new ObjectId(this.user.id);
 
-    const midis = await Trial.aggregate([
+    const plays = await Trial.aggregate([
       {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
@@ -1149,7 +1149,7 @@ module.exports = class Session {
       {$limit: 5},
     ]).exec();
 
-    success(done, midis.map((x) => serializePlay(x)));
+    success(done, plays.map((x) => serializePlay(x)));
   }
 
   async onClWebMidiRecentlyPlayed(done) {
