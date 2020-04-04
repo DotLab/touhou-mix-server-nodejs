@@ -4,6 +4,8 @@ const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
 
+const BUCKET_URL = 'https://storage.thmix.org';
+
 exports.User = mongoose.model('User', {
   name: String,
   email: String,
@@ -92,10 +94,11 @@ const MidiSchema = new mongoose.Schema({
   artistName: String,
   artistNameEng: String,
   artistUrl: String,
+
+  imagePath: String,
   coverPath: String,
-  coverUrl: String,
   coverBlurPath: String,
-  coverBlurUrl: String,
+
   // meta
   uploadedDate: Date,
   approvedDate: Date,
@@ -130,10 +133,6 @@ const MidiSchema = new mongoose.Schema({
   downCount: Number,
   loveCount: Number,
 
-  avgScore: Number,
-  avgCombo: Number,
-  avgAccuracy: Number,
-
   score: Number,
   combo: Number,
   accuracy: Number,
@@ -167,27 +166,30 @@ Midi.syncIndexes().catch((e) => debug(e));
 exports.Midi = Midi;
 
 exports.serializeMidi = function(midi) {
-  const {
+  let {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
-    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    coverPath, coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
     trialCount, upCount, downCount, loveCount,
-    // avgScore, avgCombo, avgAccuracy,
     score, combo, accuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     hash,
   } = midi;
+  if (album && album.coverPath) {
+    coverPath = album.coverPath;
+    coverBlurPath = album.coverBlurPath;
+  }
   return {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
-    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    coverPath, coverUrl: BUCKET_URL + coverPath, coverBlurPath, coverBlurUrl: BUCKET_URL + coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
@@ -347,22 +349,26 @@ exports.Album = mongoose.model('Album', {
   date: Date,
   abbr: String,
 
+  imagePath: String,
   coverPath: String,
   coverBlurPath: String,
 });
 
 exports.serializeAlbum = function(doc) {
   const {
-    id,
-    name, desc, date, abbr, coverPath, coverBlurPath,
+    _id,
+    name, desc, date, abbr,
+    songs, composer,
+    coverPath, coverBlurPath,
   } = doc;
-  const coverUrl = coverPath ? 'https://storage.thmix.org' + coverPath : null;
-  // const coverUrl = coverPath ? 'https://storage.cloud.google.com/scarletea' + coverPath : null;
-  const coverBlurUrl = coverBlurPath ? 'https://storage.thmix.org' + coverBlurPath : null;
-
   return {
-    id,
-    name, desc, date, abbr, coverPath, coverBlurPath, coverUrl, coverBlurUrl,
+    _id,
+    id: _id,
+    name, desc, date, abbr,
+    songs, composer,
+    coverPath, coverBlurPath,
+    coverUrl: coverPath ? BUCKET_URL + coverPath : null,
+    coverBlurUrl: coverBlurPath ? BUCKET_URL + coverBlurPath : null,
   };
 };
 
