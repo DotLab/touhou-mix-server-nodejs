@@ -17,7 +17,7 @@ const {
   Person, serializePerson,
   Soundfont, createDefaultSoundfont, serializeSoundfont,
   Resource, createDefaultResource, serializeResource,
-  Trial,
+  Trial, serializeTrial, serializePlay,
 } = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
@@ -185,6 +185,9 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
     this.socket.on('cl_web_midi_record_list', this.onClWebMidiRecordList.bind(this));
+    this.socket.on('cl_web_midi_best_performance', this.onClWebMidiBestPerformance.bind(this));
+    this.socket.on('cl_web_midi_most_played', this.onClWebMidiMostPlayed.bind(this));
+    this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
@@ -1106,5 +1109,66 @@ module.exports = class Session {
 
     resource = await Resource.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeResource(resource));
+  }
+
+  async onClWebMidiBestPerformance(done) {
+    debug('  onClWebMidiBestPerformance');
+
+    if (!this.user) return error(done, 'forbidden');
+    const id = new ObjectId(this.user.id);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$sort: {performance: -1}},
+      {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
+      {$unwind: '$midi'},
+      {$limit: 5},
+    ]).exec();
+
+    success(done, trials.map((x) => serializeTrial(x)));
+  }
+
+  async onClWebMidiMostPlayed(done) {
+    debug('  onClWebMidiMostPlayed');
+
+    if (!this.user) return error(done, 'forbidden');
+    const id = new ObjectId(this.user.id);
+
+    const plays = await Trial.aggregate([
+      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$group: {_id: '$midiId', count: {$sum: 1}}},
+      {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
+      {$unwind: '$midi'},
+      {$lookup: {from: 'songs', localField: 'midi.songId', foreignField: '_id', as: 'song'}}, // related songs
+      {$unwind: '$song'},
+      {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}}, // composer
+      {$unwind: '$composer'},
+      {$sort: {count: -1}},
+      {$limit: 5},
+    ]).exec();
+
+    success(done, plays.map((x) => serializePlay(x)));
+  }
+
+  async onClWebMidiRecentlyPlayed(done) {
+    debug('  onClWebMidiRecentlyPlayed');
+
+    if (!this.user) return error(done, 'forbidden');
+    const id = new ObjectId(this.user.id);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$sort: {date: -1}},
+      {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$sort: {date: -1}},
+      {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
+      {$unwind: '$midi'},
+      {$limit: 5},
+    ]).exec();
+
+    success(done, trials.map((x) => serializeTrial(x)));
   }
 };
