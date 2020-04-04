@@ -788,13 +788,20 @@ module.exports = class Session {
   }
 
   async onClWebAlbumList(done) {
-    const sort = String('-date');
     debug('  onClWebAlbumList');
 
-    const albums = await Album.find({})
-        .sort(sort);
+    const albums = await Song.aggregate([
+      {$lookup: {from: 'persons', localField: 'composerId', foreignField: '_id', as: 'composer'}},
+      {$unwind: {path: '$composer'}},
+      {$group: {_id: '$albumId', songs: {$push: '$$ROOT'}}},
+      {$lookup: {from: 'albums', localField: '_id', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album'}},
+      {$addFields: {'album.songs': '$songs'}},
+      {$replaceRoot: {newRoot: '$album'}},
+      {$sort: {date: -1}},
+    ]);
 
-    success(done, albums.map((album) => serializeAlbum(album)));
+    success(done, albums);
   }
 
   async onClWebSongList({albumId, page}, done) {
