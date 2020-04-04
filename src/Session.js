@@ -455,7 +455,7 @@ module.exports = class Session {
     success(done, serializeMidi(midi[0]));
   }
 
-  async onClWebMidiList({albumId, songId, status, sort, page}, done) {
+  async onClWebMidiList({albumId, songId, status, sort, page, search}, done) {
     status = String(status);
     sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
@@ -467,6 +467,10 @@ module.exports = class Session {
       query.status = status;
     }
 
+    if (search) {
+      query.$text = {$search: search};
+    }
+
     const songQuery = {};
     if (albumId) {
       songQuery.albumId = new ObjectId(albumId);
@@ -474,6 +478,7 @@ module.exports = class Session {
     if (songId) {
       songQuery._id = new ObjectId(songId);
     }
+    console.log(query);
 
     const midis = await Song.aggregate([
       {$match: songQuery},
