@@ -18,6 +18,7 @@ module.exports = class WebsocketSession {
     /** @type {import('./WebsocketServer')} */
     this.server = server;
     this.sessionId = sessionId;
+    /** @type {import('ws').WebSocket} */
     this.websocket = websocket;
 
     this.callbackDict = {};

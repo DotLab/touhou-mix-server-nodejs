@@ -16,17 +16,18 @@ module.exports = class WebsocketServer {
     /** @type {Object.<string, WebsocketSession} */
     this.sessionDict = {};
 
-    wsServer.on('connection', this.connectClient.bind(this));
+    this.wsServer.on('connection', this.onClientConnection.bind(this));
   }
 
-  connectClient(websocket) {
-    debug('connectClient');
+  onClientConnection(socket) {
+    debug('onClientConnection');
 
     const sessionId = crypto.randomBytes(16).toString('base64');
-    this.sessionDict[sessionId] = new WebsocketSession(this, sessionId, websocket);
+    this.sessionDict[sessionId] = new WebsocketSession(this, sessionId, socket);
   }
 
   closeSession(session) {
+    session;
     delete this.sessionDict[session.sessionId];
   }
 };

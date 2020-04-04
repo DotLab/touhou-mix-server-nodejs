@@ -2,13 +2,12 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
-const {Translate} = require('@google-cloud/translate').v2;
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
+const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Build, serializeBuild,
   Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont,
   Resource, createDefaultResource, serializeResource} = require('./models');
 
@@ -67,6 +66,18 @@ function genPendingCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
+function genericGet() {
+
+}
+
+function genericList() {
+
+}
+
+function genericUpdate() {
+
+}
+
 module.exports = class Session {
   /**
    * @param {Server} server
@@ -95,17 +106,9 @@ module.exports = class Session {
   onClHandshake({version, intent}, done) {
     debug('  onClHandshake', version, intent);
 
-    if (version !== this.server.version) {
-      return this.server.endSession(this.socket.id);
-    }
+    this.listenWebClient();
 
-    if (intent === INTENT_WEB) {
-      this.listenWebClient();
-    } else {
-      this.listenAppClient();
-    }
-
-    success(done, {version: this.server.version});
+    success(done, {version});
   }
 
   listenWebClient() {
@@ -130,10 +133,10 @@ module.exports = class Session {
     this.socket.on('cl_web_soundfont_update', this.onClWebSoundfontUpdate.bind(this));
     this.socket.on('cl_web_soundfont_upload_cover', this.onClWebSoundfontUploadCover.bind(this));
 
-    this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
-    this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
-    this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
-    this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
+    // this.socket.on('cl_web_board_get_messages', this.onClWebBoardGetMessages.bind(this));
+    // this.socket.on('cl_web_board_request_message_update', this.onClWebBoardRequestMessageUpdate.bind(this));
+    // this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
+    // this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
 
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
 
@@ -162,10 +165,6 @@ module.exports = class Session {
     this.socket.on('cl_web_resource_list', this.onClWebResourceList.bind(this));
     this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
-  }
-
-  listenAppClient() {
-    this.socket.on('cl_app_user_login', this.onClAppUserLogin.bind(this));
   }
 
   async onClWebUserRegisterPre({recaptcha, name, email}, done) {
@@ -440,53 +439,37 @@ module.exports = class Session {
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
 
-  async onClWebBoardGetMessages(done) {
-    debug('  onClWebBoardGetMessages');
-    const messages = await Message.find().sort({date: -1}).limit(50).lean().exec();
-    success(done, messages);
-  }
+  // async onClWebBoardGetMessages(done) {
+  //   debug('  onClWebBoardGetMessages');
+  //   const messages = await Message.find().sort({date: -1}).limit(50).lean().exec();
+  //   success(done, messages);
+  // }
 
-  async onClWebBoardSendMessage({recaptcha, text}, done) {
-    text = String(text);
-    debug('  onClWebBoardSendMessages', text);
+  // async onClWebBoardSendMessage({recaptcha, text}, done) {
+  //   text = String(text);
+  //   debug('  onClWebBoardSendMessages', text);
 
-    const res = await verifyRecaptcha(recaptcha, this.socketIp);
-    if (res !== true) return error(done, 'invalid recaptcha');
+  //   const res = await verifyRecaptcha(recaptcha, this.socketIp);
+  //   if (res !== true) return error(done, 'invalid recaptcha');
 
-    const message = await Message.create({
-      userId: this.user.id,
-      userName: this.user.name,
-      userAvatarUrl: this.user.avatarUrl,
-      text,
-      date: new Date(),
-    });
-    this.server.sendBoardMessage(message.toObject());
-    success(done);
-  }
+  //   const message = await Message.create({
+  //     userId: this.user.id,
+  //     userName: this.user.name,
+  //     userAvatarUrl: this.user.avatarUrl,
+  //     text,
+  //     date: new Date(),
+  //   });
+  //   this.server.sendBoardMessage(message.toObject());
+  //   success(done);
+  // }
 
-  async onClWebBoardRequestMessageUpdate() {
-    this.server.addBoardListener(this);
-  }
+  // async onClWebBoardRequestMessageUpdate() {
+  //   this.server.addBoardListener(this);
+  // }
 
-  async onClWebBoardStopMessageUpdate() {
-    this.server.removeBoardListener(this);
-  }
-
-  async onClAppUserLogin({email, password}, done) {
-    debug('  onClAppUserLogin', email, password);
-
-    const user = await User.findOne({email: email});
-    if (!user) return error(done, 'wrong combination');
-
-    const hash = calcPasswordHash(password, user.salt);
-    if (hash === user.hash) { // matched
-      this.user = user;
-      this.user = await this.updateUser({seenDate: new Date()});
-      return success(done, serializeUser(this.user));
-    }
-
-    error(done, 'wrong combination');
-  }
+  // async onClWebBoardStopMessageUpdate() {
+  //   this.server.removeBoardListener(this);
+  // }
 
   async onClWebTranslate({src, lang}, done) {
     debug('  onClWebTranslate', src, lang);

@@ -1,11 +1,27 @@
+const {Storage} = require('@google-cloud/storage');
+const fs = require('fs');
+const path = require('path');
+
 module.exports = class BucketService {
-  constructor(storage, tempPath, bucketName) {
-    this.storage = storage;
+  constructor(tempPath, bucketName) {
+    this.storage = new Storage();
     this.tempPath = tempPath;
 
     this.bucketName = bucketName;
-    /** @type {import('@google-cloud/storage').Bucket} */
-    this.bucket = storage.bucket(bucketName);
+    this.bucket = this.storage.bucket(bucketName);
+
+    this.clearTemp();
+  }
+
+  clearTemp() {
+    if (fs.existsSync(this.tempPath)) {
+      const files = fs.readdirSync(this.tempPath);
+      for (const file of files) {
+        fs.unlinkSync(path.join(this.tempPath, file));
+      }
+    } else {
+      fs.mkdirSync(this.tempPath);
+    }
   }
 
   uploadPublic(file, destination) {
