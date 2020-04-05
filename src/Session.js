@@ -1138,6 +1138,8 @@ module.exports = class Session {
       {$unwind: '$midi'},
       {$lookup: {from: 'songs', localField: 'midi.songId', foreignField: '_id', as: 'song'}}, // related songs
       {$unwind: '$song'},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+      {$unwind: '$album'},
       {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}}, // composer
       {$unwind: '$composer'},
       {$sort: {count: -1}},
@@ -1153,32 +1155,48 @@ module.exports = class Session {
     const trials = await Trial.aggregate([
       {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$sort: {date: -1}},
-      {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
-      {$replaceWith: '$first'},
-      {$sort: {date: -1}},
-      {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
-      {$unwind: '$midi'},
+      {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
+        {$match: {$expr: {$eq: ['$_id', '$$id']}}},
+        {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
+        {$unwind: '$song'},
+        {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+        {$unwind: '$album'},
+      ], as: 'midi'}},
+      {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
       {$limit: 5},
     ]).exec();
 
     success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  async onClWebMidiPlayHistory({id, startDate, endDate}, done) {
+  async onClWebMidiPlayHistory({id, startDate, endDate, interval}, done) {
+    startDate = new Date(startDate);
+    endDate = new Date(endDate);
     debug('  onClWebMidiPlayHistory', startDate, endDate);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION, date: {$gte: new Date(startDate), $lte: new Date(endDate)}}},
+      {$match: {userId: new ObjectId(id), date: {$gte: startDate, $lte: endDate}}},
       {$sort: {date: 1}},
-      {$group: {_id: {month: {$month: '$date'}, year: {$year: '$date'}}, count: {$sum: 1}}},
-      {$sort: {'_id.year': 1, '_id.month': 1}},
+      {$group: {
+        _id: {$floor: {$divide: [{$subtract: [endDate, '$date']}, interval]}},
+        h: {$max: '$score'},
+        l: {$min: '$score'},
+        o: {$first: '$score'},
+        c: {$last: '$score'},
+        v: {$sum: 1},
+      }},
+      {$sort: {_id: -1}},
+      {$limit: 100},
+      {$addFields: {
+        // 1 2 3 4 5 (1, 5, 2)
+        //   |_1 |_0 (endDate - $date) / interval
+        //   |_2 |_0 (((endDate - $date) / interval) * interval)
+        //   \_3 \_5 (endDate - ((endDate - $date) / interval) * interval)
+        t: {$subtract: [endDate, {$multiply: ['$_id', interval]}]},
+      }},
+      {$project: {_id: 0}},
     ]).exec();
 
-    success(done, trials.map((x) => formatQuery(x)));
+    success(done, trials);
   }
 };
-
-function formatQuery(q) {
-  const {_id, count} = q;
-  return {month: _id.month, year: _id.year, count};
-}
