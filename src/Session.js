@@ -1168,7 +1168,7 @@ module.exports = class Session {
     debug('  onClWebMidiMostPlayed', id);
 
     const plays = await Trial.aggregate([
-      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id)}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
       {$unwind: '$midi'},
@@ -1189,7 +1189,7 @@ module.exports = class Session {
     debug('  onClWebMidiRecentlyPlayed', id);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id)}},
       {$sort: {date: -1}},
       {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
         {$match: {$expr: {$eq: ['$_id', '$$id']}}},
