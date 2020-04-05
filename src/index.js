@@ -37,40 +37,21 @@ if (fs.existsSync(tempPath)) {
   fs.mkdirSync(tempPath);
 }
 
-// const {User, Midi} = require('./models');
-// User.deleteMany({}).exec();
-// Midi.deleteMany({}).exec();
-// const crypto = require('crypto');
-// function genPasswordSalt() {
-//   return crypto.randomBytes(256).toString('base64');
-// }
-// function calcPasswordHash(password, salt) {
-//   const hasher = crypto.createHash('sha512');
-//   hasher.update(password);
-//   hasher.update(salt);
-//   return hasher.digest('base64');
-// }
-// const salt = genPasswordSalt();
-// const hash = calcPasswordHash('test', salt);
-// User.create({
-//   name: 'Test', email: 'test@test.com', salt, hash,
-//   joinedDate: new Date(), seenDate: new Date(),
-
-//   playCount: 0,
-//   totalScores: 0,
-//   maxCombo: 0,
-//   accuracy: 0,
-
-//   totalPlayTime: 0,
-//   weightedPp: 0,
-//   ranking: 0,
-//   sCount: 0,
-//   aCount: 0,
-//   bCount: 0,
-//   cCount: 0,
-//   dCount: 0,
-//   fCount: 0,
-// });
+if (env === 'development') {
+  // create test user
+  const {User} = require('./models');
+  User.deleteMany({name: 'Test'}).exec();
+  const crypto = require('crypto');
+  const salt = crypto.randomBytes(256).toString('base64');
+  const hasher = crypto.createHash('sha512');
+  hasher.update('test');
+  hasher.update(salt);
+  const hash = hasher.digest('base64');
+  User.create({
+    name: 'Test', email: 'test@test.com', salt, hash,
+    joinedDate: new Date(), seenDate: new Date(),
+  });
+}
 
 const TranslationService = require('./TranslationService');
 const translationService = new TranslationService('microvolt-0');
