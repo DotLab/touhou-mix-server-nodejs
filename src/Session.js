@@ -1156,9 +1156,15 @@ module.exports = class Session {
       {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$sort: {score: -1}},
-      {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
-      {$unwind: '$midi'},
       {$limit: 5},
+      {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
+        {$match: {$expr: {$eq: ['$_id', '$$id']}}},
+        {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
+        {$unwind: '$song'},
+        {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+        {$unwind: '$album'},
+      ], as: 'midi'}},
+      {$unwind: '$midi'},
     ]).exec();
 
     success(done, trials.map((x) => serializeTrial(x)));
