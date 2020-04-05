@@ -2,15 +2,23 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
-const {Translate} = require('@google-cloud/translate').v2;
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 
 const debug = require('debug')('thmix:Session');
 
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, serializeUser, serializeMidi, Translation, Build, serializeBuild,
-  Album, serializeAlbum, Song, serializeSong, Person, serializePerson, Soundfont, createDefaultSoundfont, serializeSoundfont,
-  Resource, createDefaultResource, serializeResource, Trial, serializeTrial, serializePlay} = require('./models');
+const {
+  User, createDefaultUser, serializeUser,
+  Midi, createDefaultMidi, serializeMidi,
+  Message,
+  Build, serializeBuild,
+  Album, serializeAlbum,
+  Song, serializeSong,
+  Person, serializePerson,
+  Soundfont, createDefaultSoundfont, serializeSoundfont,
+  Resource, createDefaultResource, serializeResource,
+  Trial, serializeTrial, serializePlay,
+} = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
 
@@ -68,6 +76,9 @@ function genPendingCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
+const COVER_HEIGHT = 250;
+const COVER_WIDTH = 900;
+
 module.exports = class Session {
   /**
    * @param {Server} server
@@ -91,6 +102,55 @@ module.exports = class Session {
 
   updateUser(spec) {
     return User.findByIdAndUpdate(this.user.id, spec, {new: true});
+  }
+
+  async uploadCover(buffer) {
+    const hash = calcFileHash(buffer);
+    const image = sharp(buffer);
+    const meta = await image.metadata();
+
+    // original
+    const fileName = `${hash}.${meta.format}`;
+    // cover size jpg
+    const coverFileName = `${hash}-cover.jpg`;
+    // blur png
+    const blurFileName = `${hash}-blur.png`;
+
+    const localPath = this.server.tempPath + '/' + fileName;
+    const coverLocalPath = this.server.tempPath + '/' + coverFileName;
+    const blurLocalPath = this.server.tempPath + '/' + blurFileName;
+
+    const remotePath = '/imgs/' + fileName;
+    const coverRemotePath = '/imgs/' + coverFileName;
+    const blurRemotePath = '/imgs/' + blurFileName;
+
+    // generate
+    await Promise.all([
+      image.toFile(localPath),
+      meta.width > COVER_WIDTH && meta.height > COVER_HEIGHT ?
+          // crop
+          image.resize(COVER_WIDTH, COVER_HEIGHT).jpeg({quality: 80}).toFile(coverLocalPath) :
+          image.jpeg({quality: 80}).toFile(coverLocalPath),
+      image.resize(256, 256).modulate({brightness: 1.05, saturation: 2}).blur(12)
+          .resize(128, 128).png().toFile(blurLocalPath),
+    ]);
+
+    // upload
+    await Promise.all([
+      this.server.bucketUploadPublic(localPath, remotePath),
+      this.server.bucketUploadPublic(coverLocalPath, coverRemotePath),
+      this.server.bucketUploadPublic(blurLocalPath, blurRemotePath),
+    ]);
+
+    fs.unlink(localPath, emptyHandle);
+    fs.unlink(coverLocalPath, emptyHandle);
+    fs.unlink(blurLocalPath, emptyHandle);
+
+    return {
+      path: remotePath,
+      coverPath: coverRemotePath,
+      blurPath: blurRemotePath,
+    };
   }
 
   onClHandshake({version, intent}, done) {
@@ -124,6 +184,7 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+    this.socket.on('cl_web_midi_record_list', this.onClWebMidiRecordList.bind(this));
     this.socket.on('cl_web_midi_best_performance', this.onClWebMidiBestPerformance.bind(this));
     this.socket.on('cl_web_midi_most_played', this.onClWebMidiMostPlayed.bind(this));
     this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
@@ -367,33 +428,40 @@ module.exports = class Session {
     if (!this.user) return error(done, 'forbidden');
     if (!verifyObjectId(id)) return error(done, 'forbidden');
     if (size !== buffer.length) return error(done, 'tampering with api');
-    if (size > MB) return error(done, 'tampering with api');
+    if (size > MB) return error(done, 'too large');
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
-    if (!midi.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
 
-    const hash = calcFileHash(buffer);
-    const remotePath = `/imgs/${hash}.jpg`;
-    const blurRemotePath = `/imgs/${hash}.png`;
-    const localPath = `${this.server.tempPath}/${hash}.jpg`;
-    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
-
-    const cover = sharp(buffer).resize(256, 256);
-    await cover.jpeg({quality: 80}).toFile(localPath);
-    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
-    await cover.png().toFile(blurLocalPath);
-
-    await this.server.bucketUploadPublic(localPath, remotePath);
-    fs.unlink(localPath, emptyHandle);
-    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
-    fs.unlink(blurLocalPath, emptyHandle);
-
+    const paths = await this.uploadCover(buffer);
     midi = await Midi.findByIdAndUpdate(id, {$set: {
-      coverUrl: this.server.bucketGetPublicUrl(remotePath), coverPath: remotePath,
-      coverBlurUrl: this.server.bucketGetPublicUrl(blurRemotePath), coverBlurPath: blurRemotePath,
+      imagePath: paths.path,
+      coverPath: paths.coverPath,
+      coverBlurPath: paths.blurPath,
     }}, {new: true});
+
     success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiRecordList({id}, done) {
+    debug('  onClWebMidiRecordList', id);
+
+    const midi = await Midi.findOne({_id: new ObjectId(id)});
+    if (!midi) return error(done, 'not found');
+
+    const trials = await Trial.aggregate([
+      {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
+      {$sort: {score: -1}},
+      {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
+      {$unwind: '$user'},
+      {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
+      {$project: {user: 0}},
+      {$sort: {score: -1}}]).exec();
+
+    return success(done, trials);
   }
 
   async onClWebMidiGet({id}, done) {
@@ -401,10 +469,17 @@ module.exports = class Session {
 
     if (!verifyObjectId(id)) return error(done, 'not found');
 
-    const midi = await Midi.findById(id);
-    if (!midi) return error(done, 'not found');
-
-    success(done, serializeMidi(midi));
+    // const midi = await Midi.findById(id);
+    // if (!midi) return error(done, 'not found');
+    const query = Midi.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+    ]);
+    const midi = await query.exec();
+    success(done, serializeMidi(midi[0]));
   }
 
   async onClWebMidiList({touhouAlbumIndex, touhouSongIndex, status, sort, page}, done) {
@@ -430,10 +505,16 @@ module.exports = class Session {
       query.status = status;
     }
 
-    const midis = await Midi.find(query)
-        .sort(sort)
-        .skip(MIDI_LIST_PAGE_LIMIT * page)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+    const midis = await Midi.aggregate([
+      {$match: query},
+      {$sort: {uploadedDate: -1}},
+      {$skip: MIDI_LIST_PAGE_LIMIT * page},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+    ]);
 
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
@@ -620,25 +701,11 @@ module.exports = class Session {
     let album = await Album.findById(id);
     if (!album) return error(done, 'not found');
 
-    const hash = calcFileHash(buffer);
-    const remotePath = `/imgs/${hash}.jpg`;
-    const blurRemotePath = `/imgs/${hash}.png`;
-    const localPath = `${this.server.tempPath}/${hash}.jpg`;
-    const blurLocalPath = `${this.server.tempPath}/${hash}.png`;
-
-    const cover = sharp(buffer).resize(256, 256);
-    await cover.jpeg({quality: 80}).toFile(localPath);
-    cover.modulate({brightness: 1.05, saturation: 2}).blur(12).resize(128, 128);
-    await cover.png().toFile(blurLocalPath);
-
-    await this.server.bucketUploadPublic(localPath, remotePath);
-    fs.unlink(localPath, emptyHandle);
-    await this.server.bucketUploadPublic(blurLocalPath, blurRemotePath);
-    fs.unlink(blurLocalPath, emptyHandle);
-
+    const paths = await this.uploadCover(buffer);
     album = await Album.findByIdAndUpdate(id, {$set: {
-      coverPath: remotePath,
-      coverBlurPath: blurRemotePath,
+      imagePath: paths.path,
+      coverPath: paths.coverPath,
+      coverBlurPath: paths.blurPath,
     }}, {new: true});
     success(done, serializeAlbum(album));
   }
@@ -786,33 +853,28 @@ module.exports = class Session {
   }
 
   async onClWebAlbumList(done) {
-    const sort = String('-date');
     debug('  onClWebAlbumList');
 
-    const albums = await Album.find({})
-        .sort(sort);
+    const albums = await Song.aggregate([
+      {$lookup: {from: 'persons', localField: 'composerId', foreignField: '_id', as: 'composer'}},
+      {$unwind: {path: '$composer'}},
+      {$group: {_id: '$albumId', songs: {$push: '$$ROOT'}}},
+      {$lookup: {from: 'albums', localField: '_id', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album'}},
+      {$addFields: {'album.songs': '$songs'}},
+      {$replaceRoot: {newRoot: '$album'}},
+      {$sort: {date: -1}},
+    ]);
 
-    success(done, albums.map((album) => serializeAlbum(album)));
+    success(done, albums.map((x) => serializeAlbum(x)));
   }
 
   async onClWebSongList({albumId, page}, done) {
     page = parseInt(page || 0);
     debug('  onClWebSongList', albumId, page);
 
-    const query = Song.aggregate([
-      {$match: {albumId: new ObjectId(albumId)}},
-      {
-        $lookup: {
-          from: 'persons',
-          let: {'id': 'composerId'},
-          pipeline: [{$project: {'name': 1, '_id': 0}}],
-          as: 'composerName',
-        },
-      },
-    ]);
-
-    const songs = await query.exec();
-    success(done, songs);
+    const songs = await Song.find({albumId: albumId});
+    success(done, songs.map((song) => serializeSong(song)));
   }
 
   async onClWebPersonList(done) {
@@ -1069,7 +1131,7 @@ module.exports = class Session {
   async onClWebMidiMostPlayed({id}, done) {
     debug('  onClWebMidiMostPlayed', id);
 
-    const midis = await Trial.aggregate([
+    const plays = await Trial.aggregate([
       {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
@@ -1082,7 +1144,7 @@ module.exports = class Session {
       {$limit: 5},
     ]).exec();
 
-    success(done, midis.map((x) => serializePlay(x)));
+    success(done, plays.map((x) => serializePlay(x)));
   }
 
   async onClWebMidiRecentlyPlayed({id}, done) {

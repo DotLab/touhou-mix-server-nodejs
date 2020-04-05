@@ -61,3 +61,32 @@ exports.filterUndefinedKeys = function(obj) {
     return acc;
   }, {});
 };
+
+/**
+ * @param {any} obj
+ * @param {String} path
+ * @param {any} val
+ * @return {any}
+ */
+function get(obj, path, val) {
+  if (!obj) return val;
+  const segs = path.split('.');
+  for (let i = 0; i < segs.length; i++) {
+    obj = obj[segs[i]];
+    if (!obj) return val;
+  }
+  return obj;
+}
+exports.get = get;
+
+/**
+ * @param {any} obj
+ * @param {String} path
+ * @param {any} val
+ * @return {any}
+ */
+function orGet(obj, path, val) {
+  if (val) return val;
+  return get(obj, path, null);
+}
+exports.orGet = orGet;
