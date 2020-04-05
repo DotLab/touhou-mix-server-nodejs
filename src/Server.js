@@ -5,15 +5,18 @@ const Session = require('./Session');
 const VERSION = 0;
 
 module.exports = class Server {
-  constructor(io, storage, tempPath) {
+  constructor(io, storage, tempPath, translationService) {
     /** @type {import('socket.io').Server} */
     this.io = io;
     this.storage = storage;
     this.tempPath = tempPath;
 
-    this.bucketName = 'thmix-static';
+    this.bucketName = 'microvolt-bucket-1';
     /** @type {import('@google-cloud/storage').Bucket} */
     this.bucket = storage.bucket(this.bucketName);
+
+    /** @type {import('./TranslationService')} */
+    this.translationService = translationService;
 
     /** @type {Object.<string, Session>} */
     this.sessions = {};
