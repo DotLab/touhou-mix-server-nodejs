@@ -1,3 +1,5 @@
+const {Midi} = require('../src/models');
+
 function createUsers() {
   for (let i = 0; i < 20; i++) {
     Midi.create({

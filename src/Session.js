@@ -321,7 +321,7 @@ module.exports = class Session {
     if (!(page > 0)) page = 0; // filter null and undefined
 
     const users = await User.find()
-        .sort('-performance')
+        .sort('-performance -score')
         .skip(page * USER_LIST_PAGE_LIMIT)
         .limit(USER_LIST_PAGE_LIMIT);
     if (!users) return error(done, 'not found');
@@ -427,7 +427,7 @@ module.exports = class Session {
     if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
-      name, desc, artistName, artistUrl, albumId, songId, authorId,
+      name, desc, artistName, artistUrl, albumId, songId, authorId: authorId ? authorId : undefined,
       sourceArtistName, sourceAlbumName, sourceSongName,
     });
 

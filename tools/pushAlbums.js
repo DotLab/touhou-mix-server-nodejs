@@ -18,11 +18,11 @@ const {Album, Song, Midi, Person} = require('../src/models');
     const doc = await Album.findOne({index: album.index});
     if (!doc) {
       // New album
-      console.log('new album', album.name);
+      // console.log('new album', album.name);
       await Album.create(album);
     } else {
       // Update album
-      console.log('update album', album.name);
+      // console.log('update album', album.name);
       await Album.findByIdAndUpdate(doc._id, album);
     }
   }
@@ -41,7 +41,7 @@ const {Album, Song, Midi, Person} = require('../src/models');
       albumIndex: song.albumIndex, track: song.track});
     if (!doc) {
       // New song
-      console.log('new song', song.name);
+      // console.log('new song', song.name);
       doc = await Song.create({
         ...song,
         albumId: albumDoc._id,
@@ -49,7 +49,7 @@ const {Album, Song, Midi, Person} = require('../src/models');
       });
     } else {
       // Update song
-      console.log('update song', song.name);
+      // console.log('update song', song.name);
       doc = await Song.findByIdAndUpdate(doc._id, {
         ...song,
         albumId: albumDoc._id,
@@ -60,7 +60,7 @@ const {Album, Song, Midi, Person} = require('../src/models');
       touhouAlbumIndex: song.albumIndex, touhouSongIndex: song.track});
     for (let j = 0; j < midis.length; j++) {
       const midi = midis[j];
-      console.log('update midi', midi.name);
+      // console.log('update midi', midi.name);
       await Midi.findByIdAndUpdate(midi._id, {
         songId: doc._id,
       });
