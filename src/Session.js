@@ -1155,7 +1155,7 @@ module.exports = class Session {
       {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
-      {$sort: {performance: -1}},
+      {$sort: {score: -1}},
       {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
       {$unwind: '$midi'},
       {$limit: 5},
