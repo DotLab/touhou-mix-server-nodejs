@@ -1050,14 +1050,11 @@ module.exports = class Session {
     success(done, serializeResource(resource));
   }
 
-  async onClWebMidiBestPerformance(done) {
-    debug('  onClWebMidiBestPerformance');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiBestPerformance({id}, done) {
+    debug('  onClWebMidiBestPerformance', id);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$sort: {performance: -1}},
@@ -1069,14 +1066,11 @@ module.exports = class Session {
     success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  async onClWebMidiMostPlayed(done) {
-    debug('  onClWebMidiMostPlayed');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiMostPlayed({id}, done) {
+    debug('  onClWebMidiMostPlayed', id);
 
     const midis = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
       {$unwind: '$midi'},
@@ -1091,14 +1085,11 @@ module.exports = class Session {
     success(done, midis.map((x) => serializePlay(x)));
   }
 
-  async onClWebMidiRecentlyPlayed(done) {
-    debug('  onClWebMidiRecentlyPlayed');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiRecentlyPlayed({id}, done) {
+    debug('  onClWebMidiRecentlyPlayed', id);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$sort: {date: -1}},
       {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
@@ -1111,21 +1102,13 @@ module.exports = class Session {
     success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  async onClWebMidiPlayHistory({startDate, endDate}, done) {
+  async onClWebMidiPlayHistory({id, startDate, endDate}, done) {
     debug('  onClWebMidiPlayHistory', startDate, endDate);
 
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION, date: {$gte: new Date(startDate), $lte: new Date(endDate)}}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION, date: {$gte: new Date(startDate), $lte: new Date(endDate)}}},
       {$sort: {date: 1}},
-      {$group: {
-        _id: {
-          month: {$month: '$date'},
-          year: {$year: '$date'},
-        },
-        count: {$sum: 1},
-      }},
+      {$group: {_id: {month: {$month: '$date'}, year: {$year: '$date'}}, count: {$sum: 1}}},
       {$sort: {'_id.year': 1, '_id.month': 1}},
     ]).exec();
 
