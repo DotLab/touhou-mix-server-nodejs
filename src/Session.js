@@ -1111,53 +1111,29 @@ module.exports = class Session {
     success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  formatPrevDate(gapMonth) {
-    const currMonth = new Date().getMonth();
-    const currYear = new Date().getFullYear();
-    const prevMonth = (currMonth - gapMonth) % 12 < 0 ? (currMonth - gapMonth) % 12 + 12 : (currMonth - gapMonth) % 12;
-    let prevYear;
-    if (gapMonth < currMonth) prevYear = currYear;
-    else prevYear = currYear - (gapMonth - currMonth) / 12;
-    return {year: Math.floor(prevYear), month: prevMonth};
-  }
-
-  formatQuery(q) {
-    const {_id, count} = q;
-    let month = null;
-    let year = null;
-    if (_id !== 'Other') {
-      month = _id.getMonth();
-      year = _id.getFullYear();
-    }
-    return {month, year, count};
-  }
-
-  async onClWebMidiPlayHistory(done) {
-    debug('  onClWebMidiPlayHistory');
+  async onClWebMidiPlayHistory({startDate, endDate}, done) {
+    debug('  onClWebMidiPlayHistory', startDate, endDate);
 
     if (!this.user) return error(done, 'forbidden');
     const id = new ObjectId(this.user.id);
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
-      {$bucket: {
-        groupBy: '$date',
-        boundaries: [new Date(this.formatPrevDate(8).year, this.formatPrevDate(8).month),
-          new Date(this.formatPrevDate(7).year, this.formatPrevDate(7).month),
-          new Date(this.formatPrevDate(6).year, this.formatPrevDate(6).month),
-          new Date(this.formatPrevDate(5).year, this.formatPrevDate(5).month),
-          new Date(this.formatPrevDate(4).year, this.formatPrevDate(4).month),
-          new Date(this.formatPrevDate(3).year, this.formatPrevDate(3).month),
-          new Date(this.formatPrevDate(2).year, this.formatPrevDate(2).month),
-          new Date(this.formatPrevDate(1).year, this.formatPrevDate(1).month),
-          new Date(this.formatPrevDate(0).year, this.formatPrevDate(0).month),
-          new Date(this.formatPrevDate(-1).year, this.formatPrevDate(-1).month),
-        ],
-        default: 'Other',
-        output: {
-          'count': {$sum: 1},
-        }},
-      }]).exec();
+      {$match: {userId: id, version: TRIAL_SCORING_VERSION, date: {$gte: new Date(startDate), $lte: new Date(endDate)}}},
+      {$sort: {date: 1}},
+      {$group: {
+        _id: {
+          month: {$month: '$date'},
+          year: {$year: '$date'},
+        },
+        count: {$sum: 1},
+      }},
+      {$sort: {'_id.year': 1, '_id.month': 1}},
+    ]).exec();
 
-    success(done, trials.map((x) => this.formatQuery(x)));
+    success(done, trials.map((x) => formatQuery(x)));
   }
 };
+
+function formatQuery(q) {
+  const {_id, count} = q;
+  return {month: _id.month, year: _id.year, count};
+}
