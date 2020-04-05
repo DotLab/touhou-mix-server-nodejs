@@ -61,3 +61,24 @@ exports.filterUndefinedKeys = function(obj) {
     return acc;
   }, {});
 };
+
+/**
+ * "-approvedDate" -> {approvedDate: -1}
+ * @param {String} sort
+ * @return {Object.<String, Number>}
+ */
+exports.sortQueryToSpec = function(sort) {
+  const spec = {};
+  sort.split(' ').forEach((x) => {
+    if (x[0] === '-') {
+      spec[x.substring(1)] = -1;
+    } else {
+      if (x[0] === '+') {
+        spec[x.substring(1)] = 1;
+      } else {
+        spec[x] = 1;
+      }
+    }
+  });
+  return spec;
+};

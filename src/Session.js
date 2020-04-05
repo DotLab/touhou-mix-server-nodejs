@@ -459,35 +459,32 @@ module.exports = class Session {
     status = String(status);
     sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
-    debug('  onClWebMidiList', albumId, songId, status, sort, page);
+    debug('  onClWebMidiList', albumId, songId, status, sort, page, search);
 
-    const query = {};
-
-    if (status !== 'undefined') {
-      query.status = status;
-    }
-
+    const pipeline = [];
     if (search) {
-      query.$text = {$search: search};
-    }
-
-    const songQuery = {};
-    if (albumId) {
-      songQuery.albumId = new ObjectId(albumId);
+      pipeline.push({$match: {$text: {$search: search}}});
     }
     if (songId) {
-      songQuery._id = new ObjectId(songId);
+      pipeline.push({$match: {songId: new ObjectId(songId)}});
     }
-    console.log(query);
+    if (status !== 'undefined') {
+      pipeline.push({$match: {status: status}});
+    }
+    pipeline.push({$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}});
+    pipeline.push({$unwind: {path: '$song'}});
+    if (albumId) {
+      pipeline.push({$match: {'song.albumId': new ObjectId(albumId)}});
+    }
+    pipeline.push({$sort: {uploadedDate: -1}});
+    pipeline.push({$skip: page * MIDI_LIST_PAGE_LIMIT});
+    pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
+    pipeline.push({$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}});
+    pipeline.push({$unwind: {path: '$album', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$lookup: {from: 'composers', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
+    pipeline.push({$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}});
 
-    const midis = await Song.aggregate([
-      {$match: songQuery},
-      {$lookup: {from: 'midis', localField: '_id', foreignField: 'songId', as: 'midi'}},
-      {$unwind: {path: '$midi'}},
-      {$replaceRoot: {newRoot: '$midi'}},
-      {$match: query},
-    ]).exec();
-
+    const midis = await Midi.aggregate(pipeline);
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
 
