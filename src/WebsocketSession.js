@@ -133,10 +133,17 @@ module.exports = class WebsocketSession {
       conditions.status = status;
     }
 
-    const midis = await Midi.find(conditions)
-        .sort(sort)
-        .skip(MIDI_LIST_PAGE_LIMIT * page)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+    const midis = await Midi.aggregate([
+      {$match: conditions},
+      {$sort: {uploadedDate: -1}},
+      {$skip: MIDI_LIST_PAGE_LIMIT * page},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+    ]);
+
     this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
   }
 
