@@ -19,7 +19,7 @@ const {
   Resource, createDefaultResource, serializeResource,
 } = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -476,7 +476,7 @@ module.exports = class Session {
     if (albumId) {
       pipeline.push({$match: {'song.albumId': new ObjectId(albumId)}});
     }
-    pipeline.push({$sort: {uploadedDate: -1}});
+    pipeline.push({$sort: sortQueryToSpec(sort)});
     pipeline.push({$skip: page * MIDI_LIST_PAGE_LIMIT});
     pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
     pipeline.push({$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}});
