@@ -25,7 +25,7 @@ const {Translation} = require('../src/models');
   for (const doc of docs) {
     doc.dups.shift();
     if (doc.dups.length > 0) {
-      console.log('remove', doc.dups.length);
+      // console.log('remove', doc.dups.length);
       await Translation.remove({'_id': {'$in': doc.dups}});
     }
   }
