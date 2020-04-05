@@ -329,6 +329,12 @@ exports.Translation = mongoose.model('Translation', {
   src: String,
   lang: String,
   text: String,
+
+  date: Date,
+  editorId: ObjectId,
+  editorName: String,
+
+  active: Boolean,
 });
 
 exports.Build = mongoose.model('Build', {
