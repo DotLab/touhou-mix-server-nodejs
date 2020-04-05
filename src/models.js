@@ -288,11 +288,14 @@ exports.Trial = mongoose.model('Trial', {
 });
 
 exports.serializeTrial = function(trial) {
-  const {
+  let {
     id,
     userId, midiId, date, version, score, combo, accuracy,
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
   } = trial;
+  if (midi) {
+    midi = exports.serializeMidi(midi);
+  }
   return {
     id,
     userId, midiId, date, version, score, combo, accuracy,
@@ -347,7 +350,7 @@ exports.serializeBuild = function(doc) {
     uploaderId, uploaderName, uploaderAvatarUrl,
     date, build, version, name, desc, path,
   } = doc;
-  const url = 'https://storage.thmix.org' + path;
+  const url = BUCKET_URL + path;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -407,8 +410,6 @@ exports.serializeSong = function(doc) {
   };
 };
 
-// exports.Person = mongoose.model('Person', {
-
 const PersonSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -424,9 +425,7 @@ exports.serializePerson = function(doc) {
     id,
     name, url, desc, avatarPath,
   } = doc;
-  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
-  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
-
+  const avatarUrl = avatarPath ? BUCKET_URL + avatarPath : null;
   return {
     id,
     name, url, desc, avatarPath, avatarUrl,
@@ -535,15 +534,13 @@ exports.createDefaultResource = function() {
 };
 
 exports.serializeResource = function(resource) {
-  const bucketName = 'scarletea';
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, type, desc, hash, path,
     uploadedDate, approvedDate, status, tags,
   } = resource;
-  const url = 'https://storage.googleapis.com/' + bucketName + path;
-
+  const url = BUCKET_URL + path;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -553,9 +550,10 @@ exports.serializeResource = function(resource) {
 };
 
 exports.serializePlay = function(play) {
-  const {_id, count, midi, song, composer} = play;
-
-  const coverUrl = midi.coverPath ? 'https://storage.thmix.org' + midi.coverPath : null;
-  // const coverUrl = midi.coverPath ? 'https://storage.cloud.google.com/scarletea' + midi.coverPath : null;
-  return {_id, count, midi, song, composer, coverUrl};
+  const {midi, album} = play;
+  if (midi.coverPath || album.coverPath) {
+    const coverPath = midi.coverPath || album.coverPath;
+    play.coverUrl = BUCKET_URL + coverPath;
+  }
+  return play;
 };

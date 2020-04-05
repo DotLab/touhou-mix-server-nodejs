@@ -188,6 +188,7 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_best_performance', this.onClWebMidiBestPerformance.bind(this));
     this.socket.on('cl_web_midi_most_played', this.onClWebMidiMostPlayed.bind(this));
     this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
+    this.socket.on('cl_web_midi_play_history', this.onClWebMidiPlayHistory.bind(this));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
@@ -1111,14 +1112,11 @@ module.exports = class Session {
     success(done, serializeResource(resource));
   }
 
-  async onClWebMidiBestPerformance(done) {
-    debug('  onClWebMidiBestPerformance');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiBestPerformance({id}, done) {
+    debug('  onClWebMidiBestPerformance', id);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$sort: {performance: -1}},
@@ -1130,19 +1128,18 @@ module.exports = class Session {
     success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  async onClWebMidiMostPlayed(done) {
-    debug('  onClWebMidiMostPlayed');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiMostPlayed({id}, done) {
+    debug('  onClWebMidiMostPlayed', id);
 
     const plays = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
       {$unwind: '$midi'},
       {$lookup: {from: 'songs', localField: 'midi.songId', foreignField: '_id', as: 'song'}}, // related songs
       {$unwind: '$song'},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+      {$unwind: '$album'},
       {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}}, // composer
       {$unwind: '$composer'},
       {$sort: {count: -1}},
@@ -1152,23 +1149,54 @@ module.exports = class Session {
     success(done, plays.map((x) => serializePlay(x)));
   }
 
-  async onClWebMidiRecentlyPlayed(done) {
-    debug('  onClWebMidiRecentlyPlayed');
-
-    if (!this.user) return error(done, 'forbidden');
-    const id = new ObjectId(this.user.id);
+  async onClWebMidiRecentlyPlayed({id}, done) {
+    debug('  onClWebMidiRecentlyPlayed', id);
 
     const trials = await Trial.aggregate([
-      {$match: {userId: id, version: TRIAL_SCORING_VERSION}},
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
       {$sort: {date: -1}},
-      {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
-      {$replaceWith: '$first'},
-      {$sort: {date: -1}},
-      {$lookup: {from: 'midis', localField: 'midiId', foreignField: '_id', as: 'midi'}},
-      {$unwind: '$midi'},
+      {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
+        {$match: {$expr: {$eq: ['$_id', '$$id']}}},
+        {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
+        {$unwind: '$song'},
+        {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+        {$unwind: '$album'},
+      ], as: 'midi'}},
+      {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
       {$limit: 5},
     ]).exec();
 
     success(done, trials.map((x) => serializeTrial(x)));
+  }
+
+  async onClWebMidiPlayHistory({id, startDate, endDate, interval}, done) {
+    startDate = new Date(startDate);
+    endDate = new Date(endDate);
+    debug('  onClWebMidiPlayHistory', startDate, endDate);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: new ObjectId(id), date: {$gte: startDate, $lte: endDate}}},
+      {$sort: {date: 1}},
+      {$group: {
+        _id: {$floor: {$divide: [{$subtract: [endDate, '$date']}, interval]}},
+        h: {$max: '$score'},
+        l: {$min: '$score'},
+        o: {$first: '$score'},
+        c: {$last: '$score'},
+        v: {$sum: 1},
+      }},
+      {$sort: {_id: -1}},
+      {$limit: 100},
+      {$addFields: {
+        // 1 2 3 4 5 (1, 5, 2)
+        //   |_1 |_0 (endDate - $date) / interval
+        //   |_2 |_0 (((endDate - $date) / interval) * interval)
+        //   \_3 \_5 (endDate - ((endDate - $date) / interval) * interval)
+        t: {$subtract: [endDate, {$multiply: ['$_id', interval]}]},
+      }},
+      {$project: {_id: 0}},
+    ]).exec();
+
+    success(done, trials);
   }
 };
