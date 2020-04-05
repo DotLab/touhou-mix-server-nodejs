@@ -46,6 +46,7 @@ exports.serializeUser = function(user) {
     id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
+    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   };
 };
