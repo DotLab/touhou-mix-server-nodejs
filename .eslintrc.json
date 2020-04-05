@@ -11,6 +11,7 @@
     "ecmaVersion": 9
 },
   "rules": {
+    "no-multiple-empty-lines": ["error", {"max": 1}],
     "linebreak-style": "off",
     "require-jsdoc": "off",
     "max-len": "off"

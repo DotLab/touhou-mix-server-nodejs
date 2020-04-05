@@ -17,6 +17,8 @@ const {
   Person, serializePerson,
   Soundfont, createDefaultSoundfont, serializeSoundfont,
   Resource, createDefaultResource, serializeResource,
+  Trial, serializeTrial, serializePlay,
+  Translation,
 } = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec} = require('./utils');
@@ -29,17 +31,27 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+
 const ROLE_MIDI_MOD = 'midi-mod';
 const ROLE_MIDI_ADMIN = 'midi-admin';
+const ROLE_TRANSLATION_MOD = 'translation-mod';
 const ROLE_SITE_OWNER = 'site-owner';
 const ROLE_ROOT = 'root';
+
 const ROLE_PARENT_DICT = {
   [ROLE_MIDI_MOD]: ROLE_MIDI_ADMIN,
   [ROLE_MIDI_ADMIN]: ROLE_SITE_OWNER,
+
+  [ROLE_TRANSLATION_MOD]: ROLE_SITE_OWNER,
+
   [ROLE_SITE_OWNER]: ROLE_ROOT,
 };
+
 const IMAGE = 'image';
 const SOUND = 'sound';
+const TRIAL_SCORING_VERSION = 3;
+
+const ERROR_FORBIDDEN = 'no you cannot';
 
 function success(done, data) {
   debug('    success');
@@ -182,6 +194,11 @@ module.exports = class Session {
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
     this.socket.on('cl_web_midi_upload_cover', this.onClWebMidiUploadCover.bind(this));
+    this.socket.on('cl_web_midi_record_list', this.onClWebMidiRecordList.bind(this));
+    this.socket.on('cl_web_midi_best_performance', this.onClWebMidiBestPerformance.bind(this));
+    this.socket.on('cl_web_midi_most_played', this.onClWebMidiMostPlayed.bind(this));
+    this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
+    this.socket.on('cl_web_midi_play_history', this.onClWebMidiPlayHistory.bind(this));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
@@ -221,6 +238,9 @@ module.exports = class Session {
     this.socket.on('cl_web_resource_list', this.onClWebResourceList.bind(this));
     this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
+
+    this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
+    this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
   }
 
   listenAppClient() {
@@ -312,7 +332,7 @@ module.exports = class Session {
   async onClWebUserUpdateBio({bio}, done) {
     debug('  onClWebUserUpdateBio', bio);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
 
     this.user = await this.updateUser({bio});
     success(done, serializeUser(this.user));
@@ -321,9 +341,9 @@ module.exports = class Session {
   async onClWebUserUpdatePassword({currentPassword, password}, done) {
     debug('  onClWebUserUpdatePassword', currentPassword, password);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     const hash = calcPasswordHash(currentPassword, this.user.salt);
-    if (hash !== this.user.hash) return error(done, 'forbidden');
+    if (hash !== this.user.hash) return error(done, ERROR_FORBIDDEN);
 
     const newSalt = genPasswordSalt();
     const newHash = calcPasswordHash(password, newSalt);
@@ -335,7 +355,7 @@ module.exports = class Session {
   async onClWebUserUploadAvatar({size, buffer}, done) {
     debug('  onClWebUserUploadAvatar', size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'tampering with api');
 
@@ -357,7 +377,7 @@ module.exports = class Session {
   async onClWebMidiUpload({name, size, buffer}, done) {
     debug('  onClWebMidiUpload', name, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'tampering with api');
 
@@ -399,12 +419,12 @@ module.exports = class Session {
       sourceArtistName, sourceAlbumName, sourceSongName,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
-    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
+    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId,
@@ -418,14 +438,14 @@ module.exports = class Session {
   async onClWebMidiUploadCover({id, size, buffer}, done) {
     debug('  onClWebMidiUploadCover', id, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'too large');
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
-    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, 'forbidden');
+    if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, ERROR_FORBIDDEN);
 
     const paths = await this.uploadCover(buffer);
     midi = await Midi.findByIdAndUpdate(id, {$set: {
@@ -435,6 +455,26 @@ module.exports = class Session {
     }}, {new: true});
 
     success(done, serializeMidi(midi));
+  }
+
+  async onClWebMidiRecordList({id}, done) {
+    debug('  onClWebMidiRecordList', id);
+
+    const midi = await Midi.findOne({_id: new ObjectId(id)});
+    if (!midi) return error(done, 'not found');
+
+    const trials = await Trial.aggregate([
+      {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
+      {$sort: {score: -1}},
+      {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
+      {$unwind: '$user'},
+      {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
+      {$project: {user: 0}},
+      {$sort: {score: -1}}]).exec();
+
+    return success(done, trials);
   }
 
   async onClWebMidiGet({id}, done) {
@@ -548,11 +588,34 @@ module.exports = class Session {
     }
   }
 
+  async onClWebTranslationList({lang}, done) {
+    debug('  onClWebTranslationList', lang);
+    return success(done, await Translation.find({lang, active: true}).sort({src: 1}).lean());
+  }
+
+  async onClWebTranslationUpdate({lang, src, text}, done) {
+    debug('  onClWebTranslationUpdate', lang, src, text);
+    if (!this.checkUserRole(ROLE_TRANSLATION_MOD)) return error(done, ERROR_FORBIDDEN);
+
+    await Translation.updateMany({lang, src}, {$set: {active: false}});
+    await Translation.updateOne({
+      lang, src, editorId: this.user._id,
+    }, {
+      lang, src, text,
+      editorId: this.user._id,
+      editorName: this.user.name,
+      active: true,
+      date: new Date(),
+    }, {upsert: true});
+
+    return success(done);
+  }
+
   async onClWebBuildUpload({name, size, buffer}, done) {
     debug('  onClWebBuildUpload', name, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
 
     let doc = await Build.findOne({name});
@@ -594,13 +657,13 @@ module.exports = class Session {
       id, build, version, name, desc,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_SITE_OWNER)) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let doc = await Build.findById(id);
     if (!doc) return error(done, 'not found');
-    if (!doc.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!doc.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
       build, version, name, desc,
@@ -636,7 +699,7 @@ module.exports = class Session {
   }
 
   async onClWebAlbumCreate(done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     const album = await Album.create({
       name: '',
       desc: '',
@@ -659,11 +722,11 @@ module.exports = class Session {
   }
 
   async onClWebAlbumUploadCover({id, size, buffer}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebAlbumUploadCover', id, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'tampering with api');
 
@@ -680,15 +743,15 @@ module.exports = class Session {
   }
 
   async onClWebAlbumUpdate(update, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebAlbumUpdate', update.id);
 
     const {
       id, name, desc,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let doc = await Album.findById(id);
     if (!doc) return error(done, 'not found');
@@ -702,10 +765,10 @@ module.exports = class Session {
   }
 
   async onClWebSongCreate(done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebSongCreate');
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     const song = await Song.create({
       albumId: null,
       composerId: null,
@@ -728,15 +791,15 @@ module.exports = class Session {
   }
 
   async onClWebSongUpdate(update, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebSongUpdate', update.id);
 
     const {
       id, albumId, composerId, name, desc, track,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let doc = await Song.findById(id);
     if (!doc) return error(done, 'not found');
@@ -750,7 +813,7 @@ module.exports = class Session {
   }
 
   async onClWebPersonCreate(done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     const person = await Person.create({
       name: '',
       desc: '',
@@ -772,11 +835,11 @@ module.exports = class Session {
   }
 
   async onClWebPersonUploadAvatar({id, size, buffer}, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebPersonUploadAvatar', id, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'tampering with api');
 
@@ -800,15 +863,15 @@ module.exports = class Session {
   }
 
   async onClWebPersonUpdate(update, done) {
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, 'forbidden');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
     debug('  onClWebPersonUpdate', update.id);
 
     const {
       id, name, desc, url,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let doc = await Person.findById(id);
     if (!doc) return error(done, 'not found');
@@ -859,7 +922,7 @@ module.exports = class Session {
   async onClWebSoundfontUpload({name, size, buffer}, done) {
     debug('  onClWebSoundfontUpload', name, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > 50 * MB) return error(done, 'tampering with api');
 
@@ -898,12 +961,12 @@ module.exports = class Session {
       nameEng, desc, hash, path, uploadedDate, status,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let soundfont = await Soundfont.findById(id);
     if (!soundfont) return error(done, 'not found');
-    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
       uploaderId, uploaderName, uploaderAvatarUrl, name,
@@ -917,14 +980,14 @@ module.exports = class Session {
   async onClWebSoundfontUploadCover({id, size, buffer}, done) {
     debug('  onClWebSoundfontUploadCover', id, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > MB) return error(done, 'tampering with api');
 
     let soundfont = await Soundfont.findById(id);
     if (!soundfont) return error(done, 'not found');
-    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!soundfont.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
 
     const hash = calcFileHash(buffer);
     const remotePath = `/imgs/${hash}.jpg`;
@@ -1017,7 +1080,7 @@ module.exports = class Session {
   async onClWebResourceUpload({name, size, buffer}, done) {
     debug('  onClWebResourceUpload', name, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
     if (size > 1000 * MB) return error(done, 'tampering with api');
 
@@ -1066,12 +1129,12 @@ module.exports = class Session {
       id, name, desc,
     } = update;
 
-    if (!this.user) return error(done, 'forbidden');
-    if (!verifyObjectId(id)) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
 
     let resource = await Resource.findById(id);
     if (!resource) return error(done, 'not found');
-    if (!resource.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+    if (!resource.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
       name, desc,
@@ -1079,5 +1142,99 @@ module.exports = class Session {
 
     resource = await Resource.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeResource(resource));
+  }
+
+  async onClWebMidiBestPerformance({id}, done) {
+    debug('  onClWebMidiBestPerformance', id);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: new ObjectId(id), version: TRIAL_SCORING_VERSION}},
+      {$group: {_id: '$midiId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$sort: {score: -1}},
+      {$limit: 5},
+      {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
+        {$match: {$expr: {$eq: ['$_id', '$$id']}}},
+        {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
+        {$unwind: '$song'},
+        {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+        {$unwind: '$album'},
+      ], as: 'midi'}},
+      {$unwind: '$midi'},
+    ]).exec();
+
+    success(done, trials.map((x) => serializeTrial(x)));
+  }
+
+  async onClWebMidiMostPlayed({id}, done) {
+    debug('  onClWebMidiMostPlayed', id);
+
+    const plays = await Trial.aggregate([
+      {$match: {userId: new ObjectId(id)}},
+      {$group: {_id: '$midiId', count: {$sum: 1}}},
+      {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
+      {$unwind: '$midi'},
+      {$lookup: {from: 'songs', localField: 'midi.songId', foreignField: '_id', as: 'song'}}, // related songs
+      {$unwind: '$song'},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+      {$unwind: '$album'},
+      {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}}, // composer
+      {$unwind: '$composer'},
+      {$sort: {count: -1}},
+      {$limit: 5},
+    ]).exec();
+
+    success(done, plays.map((x) => serializePlay(x)));
+  }
+
+  async onClWebMidiRecentlyPlayed({id}, done) {
+    debug('  onClWebMidiRecentlyPlayed', id);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: new ObjectId(id)}},
+      {$sort: {date: -1}},
+      {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
+        {$match: {$expr: {$eq: ['$_id', '$$id']}}},
+        {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
+        {$unwind: '$song'},
+        {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
+        {$unwind: '$album'},
+      ], as: 'midi'}},
+      {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
+      {$limit: 5},
+    ]).exec();
+
+    success(done, trials.map((x) => serializeTrial(x)));
+  }
+
+  async onClWebMidiPlayHistory({id, startDate, endDate, interval}, done) {
+    startDate = new Date(startDate);
+    endDate = new Date(endDate);
+    debug('  onClWebMidiPlayHistory', startDate, endDate);
+
+    const trials = await Trial.aggregate([
+      {$match: {userId: new ObjectId(id), date: {$gte: startDate, $lte: endDate}}},
+      {$sort: {date: 1}},
+      {$group: {
+        _id: {$floor: {$divide: [{$subtract: [endDate, '$date']}, interval]}},
+        h: {$max: '$score'},
+        l: {$min: '$score'},
+        o: {$first: '$score'},
+        c: {$last: '$score'},
+        v: {$sum: 1},
+      }},
+      {$sort: {_id: -1}},
+      {$limit: 100},
+      {$addFields: {
+        // 1 2 3 4 5 (1, 5, 2)
+        //   |_1 |_0 (endDate - $date) / interval
+        //   |_2 |_0 (((endDate - $date) / interval) * interval)
+        //   \_3 \_5 (endDate - ((endDate - $date) / interval) * interval)
+        t: {$subtract: [endDate, {$multiply: ['$_id', interval]}]},
+      }},
+      {$project: {_id: 0}},
+    ]).exec();
+
+    success(done, trials);
   }
 };

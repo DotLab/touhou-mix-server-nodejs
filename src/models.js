@@ -189,7 +189,8 @@ exports.serializeMidi = function(midi) {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
-    coverPath, coverUrl: BUCKET_URL + coverPath, coverBlurPath, coverBlurUrl: BUCKET_URL + coverBlurPath,
+    coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
+    coverBlurPath, coverBlurUrl: coverBlurPath && BUCKET_URL + coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
@@ -287,6 +288,22 @@ exports.Trial = mongoose.model('Trial', {
   missCount: Number,
 });
 
+exports.serializeTrial = function(trial) {
+  let {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+  } = trial;
+  if (midi) {
+    midi = exports.serializeMidi(midi);
+  }
+  return {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+  };
+};
+
 exports.Message = mongoose.model('Message', {
   userId: ObjectId,
   userName: String,
@@ -313,6 +330,12 @@ exports.Translation = mongoose.model('Translation', {
   src: String,
   lang: String,
   text: String,
+
+  date: Date,
+  editorId: ObjectId,
+  editorName: String,
+
+  active: Boolean,
 });
 
 exports.Build = mongoose.model('Build', {
@@ -334,7 +357,7 @@ exports.serializeBuild = function(doc) {
     uploaderId, uploaderName, uploaderAvatarUrl,
     date, build, version, name, desc, path,
   } = doc;
-  const url = 'https://storage.thmix.org' + path;
+  const url = BUCKET_URL + path;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -394,8 +417,6 @@ exports.serializeSong = function(doc) {
   };
 };
 
-// exports.Person = mongoose.model('Person', {
-
 const PersonSchema = new mongoose.Schema({
   name: String,
   url: String,
@@ -411,9 +432,7 @@ exports.serializePerson = function(doc) {
     id,
     name, url, desc, avatarPath,
   } = doc;
-  const avatarUrl = avatarPath ? 'https://storage.thmix.org' + avatarPath : null;
-  // const avatarUrl = avatarPath ? 'https://storage.cloud.google.com/scarletea' + avatarPath : null;
-
+  const avatarUrl = avatarPath ? BUCKET_URL + avatarPath : null;
   return {
     id,
     name, url, desc, avatarPath, avatarUrl,
@@ -522,19 +541,26 @@ exports.createDefaultResource = function() {
 };
 
 exports.serializeResource = function(resource) {
-  const bucketName = 'scarletea';
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, type, desc, hash, path,
     uploadedDate, approvedDate, status, tags,
   } = resource;
-  const url = 'https://storage.googleapis.com/' + bucketName + path;
-
+  const url = BUCKET_URL + path;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, type, desc, hash, path, url,
     uploadedDate, approvedDate, status, tags,
   };
+};
+
+exports.serializePlay = function(play) {
+  const {midi, album} = play;
+  if (midi.coverPath || album.coverPath) {
+    const coverPath = midi.coverPath || album.coverPath;
+    play.coverUrl = BUCKET_URL + coverPath;
+  }
+  return play;
 };

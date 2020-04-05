@@ -1,10 +1,15 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, Message, createDefaultUser, createDefaultMidi, Trial, serializeUser, serializeMidi, Build, serializeBuild, Person} = require('./models');
+const {
+  User, serializeUser,
+  Midi, serializeMidi,
+  Trial,
+  Build, serializeBuild,
+} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
-const TRILA_SCORING_VERSION = 3;
+const TRIAL_SCORING_VERSION = 3;
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -128,10 +133,17 @@ module.exports = class WebsocketSession {
       conditions.status = status;
     }
 
-    const midis = await Midi.find(conditions)
-        .sort(sort)
-        .skip(MIDI_LIST_PAGE_LIMIT * page)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+    const midis = await Midi.aggregate([
+      {$match: conditions},
+      {$sort: {uploadedDate: -1}},
+      {$skip: MIDI_LIST_PAGE_LIMIT * page},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+    ]);
+
     this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
   }
 
@@ -162,7 +174,7 @@ module.exports = class WebsocketSession {
     const performance = Math.floor(Math.log(score));
     debug('  clAppTrialUpload', version, hash);
 
-    if (version !== TRILA_SCORING_VERSION) return this.returnError(id, 'forbidden');
+    if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
     this.user = await this.updateUser({
       $inc: {
@@ -231,7 +243,7 @@ module.exports = class WebsocketSession {
     if (!midi) return this.returnError(id, 'not found');
 
     const trials = await Trial.aggregate([
-      {$match: {midiId: midi._id, version: TRILA_SCORING_VERSION}},
+      {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
       {$sort: {score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
