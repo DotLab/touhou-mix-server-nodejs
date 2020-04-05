@@ -10,6 +10,8 @@ module.exports = {
 
     env: {
       NODE_ENV: 'production',
+      DEBUG: 'thmix:*',
+      DEBUG_COLORS: true,
     },
   }],
 };

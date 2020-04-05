@@ -58,5 +58,4 @@ async function createTrials() {
   }
 }
 
-
 createTrials();
