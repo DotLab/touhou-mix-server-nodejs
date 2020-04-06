@@ -570,8 +570,8 @@ exports.serializeResource = function(resource) {
 
 exports.serializePlay = function(play) {
   const {midi, album} = play;
-  if (midi.coverPath || album.coverPath) {
-    const coverPath = midi.coverPath || album.coverPath;
+  if ((midi && midi.coverPath) || (album && album.coverPath)) {
+    const coverPath = (midi && midi.coverPath) || (album && album.coverPath);
     play.coverUrl = BUCKET_URL + coverPath;
   }
   return play;
