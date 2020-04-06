@@ -469,7 +469,7 @@ module.exports = class Session {
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
-      {$unwind: '$user'},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
       {$project: {user: 0}},
       {$sort: {score: -1}}]).exec();
@@ -893,10 +893,10 @@ module.exports = class Session {
 
     const albums = await Song.aggregate([
       {$lookup: {from: 'persons', localField: 'composerId', foreignField: '_id', as: 'composer'}},
-      {$unwind: {path: '$composer'}},
+      {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
       {$group: {_id: '$albumId', songs: {$push: '$$ROOT'}}},
       {$lookup: {from: 'albums', localField: '_id', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       {$addFields: {'album.songs': '$songs'}},
       {$replaceRoot: {newRoot: '$album'}},
       {$sort: {date: -1}},
@@ -1160,11 +1160,11 @@ module.exports = class Session {
       {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
         {$match: {$expr: {$eq: ['$_id', '$$id']}}},
         {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
-        {$unwind: '$song'},
+        {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
         {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
-        {$unwind: '$album'},
+        {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       ], as: 'midi'}},
-      {$unwind: '$midi'},
+      {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
     ]).exec();
 
     success(done, trials.map((x) => serializeTrial(x)));
@@ -1177,13 +1177,13 @@ module.exports = class Session {
       {$match: {userId: new ObjectId(id)}},
       {$group: {_id: '$midiId', count: {$sum: 1}}},
       {$lookup: {from: 'midis', localField: '_id', foreignField: '_id', as: 'midi'}}, // related midis
-      {$unwind: '$midi'},
+      {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'songs', localField: 'midi.songId', foreignField: '_id', as: 'song'}}, // related songs
-      {$unwind: '$song'},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
-      {$unwind: '$album'},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}}, // composer
-      {$unwind: '$composer'},
+      {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
       {$sort: {count: -1}},
       {$limit: 5},
     ]).exec();
@@ -1200,9 +1200,9 @@ module.exports = class Session {
       {$lookup: {from: 'midis', let: {id: '$midiId'}, pipeline: [
         {$match: {$expr: {$eq: ['$_id', '$$id']}}},
         {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}}, // related songs
-        {$unwind: '$song'},
+        {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
         {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}}, // related albums
-        {$unwind: '$album'},
+        {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       ], as: 'midi'}},
       {$unwind: {path: '$midi', preserveNullAndEmptyArrays: true}},
       {$limit: 5},

@@ -248,7 +248,7 @@ module.exports = class WebsocketSession {
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
-      {$unwind: '$user'},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
       {$project: {user: 0}},
       {$sort: {score: -1}}]).exec();
@@ -278,16 +278,16 @@ module.exports = class WebsocketSession {
       {$match: {status: 'INCLUDED'}},
       {$group: {_id: '$songId'}},
       {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
       {$replaceRoot: {newRoot: '$song'}},
     ]);
     const albums = await Midi.aggregate([
       {$match: {status: 'INCLUDED'}},
       {$group: {_id: '$songId'}},
       {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       {$replaceRoot: {newRoot: '$album'}},
     ]);
     const persons = [
@@ -295,17 +295,17 @@ module.exports = class WebsocketSession {
         {$match: {status: 'INCLUDED'}},
         {$group: {_id: '$authorId'}},
         {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
-        {$unwind: {path: '$composer'}},
+        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
       ...(await Midi.aggregate([
         {$match: {status: 'INCLUDED'}},
         {$group: {_id: '$songId'}},
         {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-        {$unwind: {path: '$song'}},
+        {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
         {$group: {_id: '$song.composerId'}},
         {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
-        {$unwind: {path: '$composer'}},
+        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
     ];
