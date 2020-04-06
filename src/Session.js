@@ -923,8 +923,8 @@ module.exports = class Session {
     page = parseInt(page || 0);
     debug('  onClWebSongList', albumId, page);
 
-    const songs = await Song.find({albumId}).sort('track');
-    success(done, songs.map((x) => serializeSong(x)));
+    const songs = await Song.find({albumId: albumId});
+    success(done, songs.map((song) => serializeSong(song)));
   }
 
   async onClWebPersonList(done) {
