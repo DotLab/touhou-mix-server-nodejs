@@ -1,9 +1,17 @@
 const debug = require('debug')('thmix:WebsocketSession');
-const {User, Midi, serializeUser, serializeMidi, Soundfont, UserDocAction} = require('./models');
+const {
+  User, serializeUser,
+  Midi, serializeMidi,
+  Trial,
+  Build, serializeBuild,
+  Soundfont,
+  UserDocAction,
+} = require('./models');
 const crypto = require('crypto');
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
+const TRIAL_SCORING_VERSION = 3;
 
 const LOVE = 'love';
 const VOTE = 'vote';
@@ -28,6 +36,8 @@ module.exports = class WebsocketSession {
 
     this.callbackDict = {};
 
+    this.user = null;
+
     websocket.on('message', this.handleRpc.bind(this));
     websocket.on('close', this.closeSession.bind(this));
     websocket.on('error', this.handleError.bind(this));
@@ -51,6 +61,11 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
         case 'clAppUserDocAction': this.clAppUserDocAction(id, args); break;
+        case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
+        case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
+        case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
+        case 'ClAppTranslate': this.clAppTranslate(id, args); break;
+        case 'ClAppMidiBundleBuild': this.clAppMidiBundleBuild(id, args); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -128,10 +143,17 @@ module.exports = class WebsocketSession {
       conditions.status = status;
     }
 
-    const midis = await Midi.find(conditions)
-        .sort(sort)
-        .skip(MIDI_LIST_PAGE_LIMIT * page)
-        .limit(MIDI_LIST_PAGE_LIMIT);
+    const midis = await Midi.aggregate([
+      {$match: conditions},
+      {$sort: {uploadedDate: -1}},
+      {$skip: MIDI_LIST_PAGE_LIMIT * page},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+    ]);
+
     this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
   }
 
@@ -293,5 +315,156 @@ module.exports = class WebsocketSession {
     }
 
     this.returnSuccess(id);
+  }
+
+  async clAppTrialUpload(id, trial) {
+    const {
+      hash,
+      score, combo, accuracy,
+      perfectCount, greatCount, goodCount, badCount, missCount,
+      version,
+    } = trial;
+    const performance = Math.floor(Math.log(score));
+    debug('  clAppTrialUpload', version, hash);
+
+    if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
+    if (!this.user) return this.returnError(id, 'forbidden');
+    this.user = await this.updateUser({
+      $inc: {
+        trialCount: 1,
+        passCount: 1,
+        score,
+        combo,
+        performance,
+        accuracy,
+      },
+    });
+    const midi = await Midi.findOneAndUpdate({hash}, {
+      $inc: {
+        trialCount: 1,
+        passCount: 1,
+        score,
+        combo,
+        performance,
+        accuracy,
+      },
+    });
+    if (!midi) return this.returnError(id, 'not found');
+
+    await Trial.create({
+      userId: this.user._id,
+      midiId: midi._id,
+      date: new Date(),
+
+      score, combo, accuracy, performance,
+      perfectCount, greatCount, goodCount, badCount, missCount,
+
+      version,
+    });
+
+    this.returnSuccess(id);
+  }
+
+  async clAppCheckVersion(id, {version}) {
+    debug('  clAppCheckVersion', version);
+
+    let [build] = await Build.find({}).sort('-date').limit(1).lean().exec();
+    build = serializeBuild(build);
+
+    this.returnSuccess(id, {
+      androidVersion: '2.2.84',
+      androidUrl: 'https://play.google.com/store/apps/details?id=kailang.touhoumix',
+
+      androidBetaVersion: '3.0.0.259',
+      androidBetaUrl: 'https://play.google.com/apps/testing/kailang.touhoumix',
+
+      androidAlphaVersion: build.version,
+      androidAlphaUrl: build.url,
+
+      iosVersion: '2.2.86',
+      iosUrl: 'https://apps.apple.com/us/app/touhou-mix-a-touhou-game/id1454875483',
+
+      iosBetaVersion: '3.0.258',
+      iosBetaUrl: 'https://testflight.apple.com/join/fM6ung3w',
+    });
+  }
+
+  async clAppMidiRecordList(id, {hash}) {
+    debug('  clAppMidiRecordList', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
+
+    const trials = await Trial.aggregate([
+      {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
+      {$sort: {score: -1}},
+      {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
+      {$replaceWith: '$first'},
+      {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
+      {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
+      {$project: {user: 0}},
+      {$sort: {score: -1}}]).exec();
+
+    this.returnSuccess(id, trials);
+  }
+
+  async clAppTranslate(id, {src, lang}) {
+    debug('  clAppTranslate', src, lang);
+
+    try {
+      const text = await this.server.translationService.translate(src, lang);
+      return this.returnSuccess(id, text);
+    } catch (e) {
+      debug(e);
+      return this.returnError(id, String(e));
+    }
+  }
+
+  async clAppMidiBundleBuild(id) {
+    debug('  clAppMidiBundleBuild');
+
+    const midis = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+    ]);
+    const songs = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+      {$group: {_id: '$songId'}},
+      {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$replaceRoot: {newRoot: '$song'}},
+    ]);
+    const albums = await Midi.aggregate([
+      {$match: {status: 'INCLUDED'}},
+      {$group: {_id: '$songId'}},
+      {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+      {$replaceRoot: {newRoot: '$album'}},
+    ]);
+    const persons = [
+      ...(await Midi.aggregate([
+        {$match: {status: 'INCLUDED'}},
+        {$group: {_id: '$authorId'}},
+        {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
+        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+        {$replaceRoot: {newRoot: '$composer'}},
+      ])),
+      ...(await Midi.aggregate([
+        {$match: {status: 'INCLUDED'}},
+        {$group: {_id: '$songId'}},
+        {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
+        {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+        {$group: {_id: '$song.composerId'}},
+        {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
+        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+        {$replaceRoot: {newRoot: '$composer'}},
+      ])),
+    ];
+
+    return this.returnSuccess(id, {
+      midis, songs, albums, persons,
+    });
   }
 };

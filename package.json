@@ -6,13 +6,14 @@
   "scripts": {
     "start": "cross-env NODE_ENV=production node src/index.js",
     "staging": "cross-env NODE_ENV=staging node src/index.js",
-    "dev": "cross-env GOOGLE_APPLICATION_CREDENTIALS=E:\\microvolt-0-9011f72502f4.json NODE_ENV=development DEBUG=thmix* nodemon src/index.js",
+    "dev": "cross-env GOOGLE_APPLICATION_CREDENTIALS=/mnt/e/microvolt-0-9011f72502f4.json NODE_ENV=development DEBUG=thmix* nodemon src/index.js",
     "test": "eslint ."
   },
   "author": "Kailang Fu",
   "license": "CC-BY-NC-SA-4.0",
   "dependencies": {
     "@google-cloud/storage": "^2.4.2",
+    "@google-cloud/translate": "^5.3.0",
     "axios": "^0.18.0",
     "debug": "^4.1.1",
     "eslint": "^5.12.1",
