@@ -96,6 +96,7 @@ const MidiSchema = new mongoose.Schema({
   artistNameEng: String,
   artistUrl: String,
 
+  mp3Path: String,
   imagePath: String,
   coverPath: String,
   coverBlurPath: String,
@@ -171,6 +172,7 @@ exports.serializeMidi = function(midi) {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    mp3Path,
     coverPath, coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
@@ -190,6 +192,7 @@ exports.serializeMidi = function(midi) {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
     coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
     coverBlurPath, coverBlurUrl: coverBlurPath && BUCKET_URL + coverBlurPath,
     uploadedDate, approvedDate, status,

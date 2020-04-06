@@ -4,6 +4,8 @@ const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
 
 const debug = require('debug')('thmix:Session');
 
@@ -390,8 +392,21 @@ module.exports = class Session {
 
     const remotePath = `/midis/${hash}.mid`;
     const localPath = `${this.server.tempPath}/${hash}.mid`;
-
     fs.writeFileSync(localPath, buffer);
+
+    let mp3RemotePath = `/sounds/${hash}.mp3`;
+    const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
+    try {
+      debug('    generating mp3');
+      await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
+      await this.server.bucketUploadPublic(mp3LocalPath, mp3RemotePath);
+      fs.unlink(mp3LocalPath, emptyHandle);
+    } catch (e) {
+      // cannot generate mp3
+      debug('    generate mp3 failed');
+      mp3RemotePath = null;
+    }
+
     await this.server.bucketUploadPublic(localPath, remotePath);
     fs.unlink(localPath, emptyHandle);
 
@@ -402,6 +417,7 @@ module.exports = class Session {
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
 
+      mp3Path: mp3RemotePath,
       name, desc: name,
       hash, path: remotePath,
 
