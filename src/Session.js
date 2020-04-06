@@ -396,8 +396,8 @@ module.exports = class Session {
 
     let mp3RemotePath = `/sounds/${hash}.mp3`;
     const mp3LocalPath = `${this.server.tempPath}/${hash}.mp3`;
-    let mp3Url = this.server.bucketGetPublicUrl(mp3RemotePath);
     try {
+      debug('    generating mp3');
       await exec(`timidity ${localPath} -Ow -o - | ffmpeg -i - -acodec libmp3lame -ab 64k ${mp3LocalPath}`);
       await this.server.bucketUploadPublic(mp3LocalPath, mp3RemotePath);
       fs.unlink(mp3LocalPath, emptyHandle);
@@ -405,7 +405,6 @@ module.exports = class Session {
       // cannot generate mp3
       debug('    generate mp3 failed');
       mp3RemotePath = null;
-      mp3Url = null;
     }
 
     await this.server.bucketUploadPublic(localPath, remotePath);
@@ -418,7 +417,6 @@ module.exports = class Session {
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
 
-      mp3Url: mp3Url,
       mp3Path: mp3RemotePath,
       name, desc: name,
       hash, path: remotePath,
