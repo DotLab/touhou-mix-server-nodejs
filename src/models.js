@@ -131,9 +131,11 @@ const MidiSchema = new mongoose.Schema({
   }],
 
   trialCount: Number,
-  upCount: Number,
-  downCount: Number,
+  // upCount: Number,
+  // downCount: Number,
   loveCount: Number,
+  voteCount: Number,
+  voteSum: Number,
 
   score: Number,
   combo: Number,
@@ -178,7 +180,8 @@ exports.serializeMidi = function(midi) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, upCount, downCount, loveCount,
+    // trialCount, upCount, downCount, loveCount,
+    trialCount, loveCount, voteCount, voteSum,
     score, combo, accuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
@@ -199,7 +202,8 @@ exports.serializeMidi = function(midi) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, upCount, downCount, loveCount,
+    trialCount, loveCount,
+    upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
@@ -461,9 +465,11 @@ exports.Soundfont = mongoose.model('Soundfont', {
   uploadedDate: Date,
   status: String, // PENDING, APPROVED, DEAD
 
-  upCount: Number,
-  downCount: Number,
+  // upCount: Number,
+  // downCount: Number,
   loveCount: Number,
+  voteCount: Number,
+  voteSum: Number,
 });
 
 exports.serializeSoundfont = function(soundfont) {
@@ -472,14 +478,16 @@ exports.serializeSoundfont = function(soundfont) {
     uploaderId, uploaderName, uploaderAvatarUrl, name,
     nameEng, desc, hash, path, uploadedDate, status,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
-    upCount, downCount, loveCount,
+    // upCount, downCount, loveCount,
+    loveCount, voteCount, voteSum,
   } = soundfont;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, nameEng, desc, hash, path, uploadedDate, status,
     coverPath, coverUrl, coverBlurPath, coverBlurUrl,
-    upCount, downCount, loveCount,
+    loveCount,
+    upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
   };
 };
 
@@ -568,3 +576,15 @@ exports.serializePlay = function(play) {
   }
   return play;
 };
+
+exports.DocAction = mongoose.model('DocAction', {
+  userId: ObjectId,
+
+  col: String,
+  docId: ObjectId,
+
+  action: String,
+  value: Number,
+
+  date: Date,
+});

@@ -4,18 +4,72 @@ const {
   Midi, serializeMidi,
   Trial,
   Build, serializeBuild,
+  Soundfont,
+  DocAction,
 } = require('./models');
 const crypto = require('crypto');
+const ObjectId = require('mongoose').Types.ObjectId;
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
 const TRIAL_SCORING_VERSION = 3;
+
+const LOVE = 'love'; // 1 to set; 0 to cancel
+const VOTE = 'vote'; // 1 to up; -1 to down;
+
+const MIDIS = 'midis';
+const SOUNDFONTS = 'soundfonts';
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
   hasher.update(password);
   hasher.update(salt);
   return hasher.digest('base64');
+}
+
+async function processDocAction(model, col, userId, docId, action, value) {
+  const oldAction = await DocAction.findOne({col, userId, docId, action});
+  const newAction = {col, userId, docId, action, date: new Date(), value};
+
+  switch (action) {
+    case LOVE: {
+      switch (value) {
+        case 1: {
+          if (!oldAction) {
+            // set love if not yet
+            debug('    love');
+            await DocAction.create(newAction);
+            await model.update({_id: docId}, {$inc: {loveCount: 1}});
+          }
+          return;
+        }
+        case 0: {
+          if (oldAction) {
+            // delete love if set
+            debug('    unlove');
+            await DocAction.remove({_id: oldAction._id});
+            await model.update({_id: docId}, {$inc: {loveCount: -1}});
+          }
+          return;
+        }
+      }
+      return;
+    }
+    case VOTE: {
+      debug('    vote', value);
+      if (!oldAction) {
+        // new vote
+        await DocAction.create(newAction);
+        await model.update({_id: docId}, {$inc: {voteCount: 1, voteSum: value}});
+        return;
+      }
+      // update vote
+      const diff = value - oldAction.value;
+      await DocAction.update({_id: oldAction._id}, {$set: {value, date: new Date()}});
+      await model.update({_id: docId}, {$inc: {voteSum: diff}});
+      return;
+    }
+  }
 }
 
 module.exports = class WebsocketSession {
@@ -50,6 +104,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
+        case 'ClAppDocAction': this.clAppDocAction(id, args); break;
         case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
         case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
@@ -162,6 +217,28 @@ module.exports = class WebsocketSession {
     time = parseInt(time);
     debug('  clAppPing', time);
     this.returnSuccess(id, time);
+  }
+
+  async clAppDocAction(id, {col, docId, action, value}) {
+    debug('  clAppDocAction', col, docId, action, value);
+
+    if (!ObjectId.isValid(docId)) return this.returnError(id, 'invalid');
+    docId = new ObjectId(docId);
+    if (!this.user) return this.returnError(id, 'forbidden');
+
+    let model = null;
+    switch (col) {
+      case MIDIS: model = Midi; break;
+      case SOUNDFONTS: model = Soundfont; break;
+      default: return this.returnError(id, 'not found');
+    }
+
+    const doc = await model.findOne(docId);
+    if (!doc) return this.returnError(id, 'not found');
+
+    await processDocAction(model, col, this.user.id, docId, action, value);
+
+    this.returnSuccess(id);
   }
 
   async clAppTrialUpload(id, trial) {

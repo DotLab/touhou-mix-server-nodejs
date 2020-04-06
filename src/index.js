@@ -21,6 +21,7 @@ mongoose.connect(`mongodb://localhost:27017/${database}`, {
   useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
 });
 mongoose.set('useFindAndModify', false);
+// mongoose.set('debug', true);
 
 const {Storage} = require('@google-cloud/storage');
 const storage = new Storage();
