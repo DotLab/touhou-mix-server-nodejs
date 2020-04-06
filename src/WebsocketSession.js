@@ -43,7 +43,6 @@ module.exports = class WebsocketSession {
 
     try {
       const {id, command, args} = JSON.parse(data);
-      debug(' handleRpc', command, args, id);
 
       switch (command) {
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
@@ -55,7 +54,8 @@ module.exports = class WebsocketSession {
         case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
         case 'ClAppTranslate': this.clAppTranslate(id, args); break;
-        case 'ClAppMidiBundleBuild': this.clAppMidiBundleBuild(id, args); break;
+        case 'ClAppMidiBundleBuild': this.clAppMidiBundleBuild(id); break;
+        default: debug('unknown rpc', command, args, id); this.returnError(id, 'unknown rpc'); break;
       }
     } catch (e) {
       this.handleError(e);
@@ -83,7 +83,7 @@ module.exports = class WebsocketSession {
   }
 
   rpc(command, args, callback) {
-    debug('  rpc', command);
+    debug('    rpc', command);
     const id = crypto.randomBytes(16).toString('base64');
     if (typeof callback === 'function') {
       this.callbackDict[id] = callback;
