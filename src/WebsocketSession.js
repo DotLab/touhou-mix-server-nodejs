@@ -5,26 +5,71 @@ const {
   Trial,
   Build, serializeBuild,
   Soundfont,
-  UserDocAction,
+  DocAction,
 } = require('./models');
 const crypto = require('crypto');
+const ObjectId = require('mongoose').Types.ObjectId;
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;
 const TRIAL_SCORING_VERSION = 3;
 
-const LOVE = 'love';
-const VOTE = 'vote';
-const UP = 'up';
-const DOWN = 'down';
-const MIDI = 'midi';
-const SOUNDFONT = 'soundfont';
+const LOVE = 'love'; // 1 to set; 0 to cancel
+const VOTE = 'vote'; // 1 to up; -1 to down;
+
+const MIDIS = 'midis';
+const SOUNDFONTS = 'soundfonts';
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
   hasher.update(password);
   hasher.update(salt);
   return hasher.digest('base64');
+}
+
+async function processDocAction(model, col, userId, docId, action, value) {
+  const oldAction = await DocAction.findOne({col, userId, docId, action});
+  const newAction = {col, userId, docId, action, date: new Date(), value};
+
+  switch (action) {
+    case LOVE: {
+      switch (value) {
+        case 1: {
+          if (!oldAction) {
+            // set love if not yet
+            debug('    love');
+            await DocAction.create(newAction);
+            await model.update({_id: docId}, {$inc: {loveCount: 1}});
+          }
+          return;
+        }
+        case 0: {
+          if (oldAction) {
+            // delete love if set
+            debug('    unlove');
+            await DocAction.remove({_id: oldAction._id});
+            await model.update({_id: docId}, {$inc: {loveCount: -1}});
+          }
+          return;
+        }
+      }
+      return;
+    }
+    case VOTE: {
+      debug('    vote', value);
+      if (!oldAction) {
+        // new vote
+        await DocAction.create(newAction);
+        await model.update({_id: docId}, {$inc: {voteCount: 1, voteSum: value}});
+        return;
+      }
+      // update vote
+      const diff = value - oldAction.value;
+      await DocAction.update({_id: oldAction._id}, {$set: {value, date: new Date()}});
+      await model.update({_id: docId}, {$inc: {voteSum: diff}});
+      return;
+    }
+  }
 }
 
 module.exports = class WebsocketSession {
@@ -60,7 +105,7 @@ module.exports = class WebsocketSession {
         case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
         case 'ClAppPing': this.clAppPing(id, args); break;
-        case 'clAppUserDocAction': this.clAppUserDocAction(id, args); break;
+        case 'ClAppDocAction': this.clAppDocAction(id, args); break;
         case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
         case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
@@ -174,145 +219,24 @@ module.exports = class WebsocketSession {
     this.returnSuccess(id, time);
   }
 
-  async clAppUserDocAction(id, {docId, connection, action, data}) {
-    debug(' clAppUserDocAction', docId, connection, action, data);
+  async clAppDocAction(id, {col, docId, action, value}) {
+    debug('  clAppDocAction', col, docId, action, value);
 
-    if (!this.user) this.returnError(id, 'forbidden');
+    if (!ObjectId.isValid(docId)) return this.returnError(id, 'invalid');
+    docId = new ObjectId(docId);
+    if (!this.user) return this.returnError(id, 'forbidden');
 
-    let doc;
-    if (connection === MIDI) {
-      doc = await Midi.findOne({id: docId});
-      if (!doc) this.returnError(id, 'not found');
-      if (action === VOTE && data === UP) {
-        const upvoted = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        if (upvoted) this.returnSuccess(id);
-
-        const downvoted = UserDocAction.findOne({docId, connection, action, data: DOWN, userId: this.user.id});
-        if (downvoted) {
-          await UserDocAction.findByIdAndUpdate(downvoted.id, {
-            data: UP,
-            date: new Date(),
-          });
-          await Midi.findByIdAndUpdate(docId, {
-            $inc: {downCount: -1},
-          });
-        }
-
-        await Midi.findByIdAndUpdate(docId, {
-          $inc: {upCount: 1},
-        });
-      } else if (action === VOTE && data === DOWN) {
-        const downvoted = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        if (downvoted) this.returnSuccess(id);
-
-        const upvoted = UserDocAction.findOne({docId, connection, action, data: UP, userId: this.user.id});
-        if (upvoted) {
-          await UserDocAction.findByIdAndUpdate(upvoted.id, {
-            data: DOWN,
-            date: new Date(),
-          });
-          await Midi.findByIdAndUpdate(docId, {
-            $inc: {upCount: -1},
-          });
-        }
-
-        await Midi.findByIdAndUpdate(docId, {
-          $inc: {downCount: 1},
-        });
-      } else if (action === LOVE && data === UP) {
-        const userDocAction = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        // if liked
-        if (userDocAction) this.returnSuccess(id);
-
-        await Midi.findByIdAndUpdate(docId, {
-          $inc: {loveCount: 1},
-        });
-        UserDocAction.create({
-          userId: this.user.id,
-          docId: docId,
-          connection: connection,
-          action: action,
-          data: data,
-          date: new Date(),
-        });
-      } else if (action === LOVE && data === DOWN) {
-        const userDocAction = UserDocAction.findOne({docId, connection, action, UP, userId: this.user.id});
-        // if not liked
-        if (!userDocAction) this.returnSuccess(id);
-
-        await Midi.findByIdAndUpdate(docId, {
-          $inc: {loveCount: -1},
-        });
-        await UserDocAction.findByIdAndRemove(userDocAction.id);
-      }
-    } else if (connection === SOUNDFONT) {
-      doc = await Soundfont.findOne({id: docId});
-      if (!doc) this.returnError(id, 'not found');
-      if (action === VOTE && data === UP) {
-        const upvoted = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        if (upvoted) this.returnSuccess(id);
-
-        const downvoted = UserDocAction.findOne({docId, connection, action, data: DOWN, userId: this.user.id});
-        if (downvoted) {
-          await UserDocAction.findByIdAndUpdate(downvoted.id, {
-            data: UP,
-            date: new Date(),
-          });
-          await Soundfont.findByIdAndUpdate(docId, {
-            $inc: {downCount: -1},
-          });
-        }
-
-        await Soundfont.findByIdAndUpdate(docId, {
-          $inc: {upCount: 1},
-        });
-      } else if (action === VOTE && data === DOWN) {
-        const downvoted = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        if (downvoted) this.returnSuccess(id);
-
-        const upvoted = UserDocAction.findOne({docId, connection, action, data: UP, userId: this.user.id});
-        if (upvoted) {
-          await UserDocAction.findByIdAndUpdate(upvoted.id, {
-            data: DOWN,
-            date: new Date(),
-          });
-          await Soundfont.findByIdAndUpdate(docId, {
-            $inc: {upCount: -1},
-          });
-        }
-
-        await Soundfont.findByIdAndUpdate(docId, {
-          $inc: {downCount: 1},
-        });
-      } else if (action === LOVE && data === UP) {
-        const userDocAction = UserDocAction.findOne({docId, connection, action, data, userId: this.user.id});
-        // if liked
-        if (userDocAction) this.returnSuccess(id);
-
-        await Soundfont.findByIdAndUpdate(docId, {
-          $inc: {loveCount: 1},
-        });
-        UserDocAction.create({
-          userId: this.user.id,
-          docId: docId,
-          connection: connection,
-          action: action,
-          data: data,
-          date: new Date(),
-        });
-      } else if (action === LOVE && data === DOWN) {
-        const userDocAction = UserDocAction.findOne({docId, connection, action, UP, userId: this.user.id});
-        // if not liked
-        if (!userDocAction) this.returnSuccess(id);
-
-        await Soundfont.findByIdAndUpdate(docId, {
-          $inc: {loveCount: -1},
-        });
-        await UserDocAction.findByIdAndRemove(userDocAction.id);
-      }
-    } else {
-      this.returnError(id, 'bad request');
+    let model = null;
+    switch (col) {
+      case MIDIS: model = Midi; break;
+      case SOUNDFONTS: model = Soundfont; break;
+      default: return this.returnError(id, 'not found');
     }
+
+    const doc = await model.findOne(docId);
+    if (!doc) return this.returnError(id, 'not found');
+
+    await processDocAction(model, col, this.user.id, docId, action, value);
 
     this.returnSuccess(id);
   }
