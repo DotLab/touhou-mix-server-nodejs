@@ -21,7 +21,7 @@ const {
   Translation,
 } = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -495,40 +495,36 @@ module.exports = class Session {
     success(done, serializeMidi(midi[0]));
   }
 
-  async onClWebMidiList({touhouAlbumIndex, touhouSongIndex, status, sort, page}, done) {
-    touhouAlbumIndex = parseInt(touhouAlbumIndex);
-    touhouSongIndex = parseInt(touhouSongIndex);
+  async onClWebMidiList({albumId, songId, status, sort, page, search}, done) {
     status = String(status);
     sort = String(sort || '-uploadedDate');
     page = parseInt(page || 0);
-    debug('  onClWebMidiList', touhouAlbumIndex, touhouSongIndex, status, sort, page);
+    debug('  onClWebMidiList', albumId, songId, status, sort, page, search);
 
-    const query = {};
-
-    if (touhouAlbumIndex > 0) {
-      query.touhouAlbumIndex = touhouAlbumIndex;
-      if (!isNaN(touhouSongIndex)) {
-        query.touhouSongIndex = touhouSongIndex;
-      }
-    } else if (touhouAlbumIndex === -1) {
-      query.touhouAlbumIndex = -1;
+    const pipeline = [];
+    if (search) {
+      pipeline.push({$match: {$text: {$search: search}}});
     }
-
+    if (songId) {
+      pipeline.push({$match: {songId: new ObjectId(songId)}});
+    }
     if (status !== 'undefined') {
-      query.status = status;
+      pipeline.push({$match: {status: status}});
     }
+    pipeline.push({$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}});
+    pipeline.push({$unwind: {path: '$song'}});
+    if (albumId) {
+      pipeline.push({$match: {'song.albumId': new ObjectId(albumId)}});
+    }
+    pipeline.push({$sort: sortQueryToSpec(sort)});
+    pipeline.push({$skip: page * MIDI_LIST_PAGE_LIMIT});
+    pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
+    pipeline.push({$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}});
+    pipeline.push({$unwind: {path: '$album', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$lookup: {from: 'composers', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
+    pipeline.push({$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}});
 
-    const midis = await Midi.aggregate([
-      {$match: query},
-      {$sort: {uploadedDate: -1}},
-      {$skip: MIDI_LIST_PAGE_LIMIT * page},
-      {$limit: MIDI_LIST_PAGE_LIMIT},
-      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
-    ]);
-
+    const midis = await Midi.aggregate(pipeline);
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
 
@@ -1031,7 +1027,7 @@ module.exports = class Session {
     status = String(status);
     sort = String(sort || '-approvedDate');
     page = parseInt(page || 0);
-    debug('  onClWebMidiList', status, sort, page);
+    debug('  onClWebSoundfontList', status, sort, page);
 
     const query = {};
 
