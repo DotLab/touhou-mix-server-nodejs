@@ -39,7 +39,7 @@ async function processDocAction(model, col, userId, docId, action, value) {
             // set love if not yet
             debug('    love');
             await DocAction.create(newAction);
-            await model.update({_id: docId}, {$inc: {loveCount: 1}});
+            await model.updateOne({_id: docId}, {$inc: {loveCount: 1}});
           }
           return;
         }
@@ -47,8 +47,8 @@ async function processDocAction(model, col, userId, docId, action, value) {
           if (oldAction) {
             // delete love if set
             debug('    unlove');
-            await DocAction.remove({_id: oldAction._id});
-            await model.update({_id: docId}, {$inc: {loveCount: -1}});
+            await DocAction.deleteOne({_id: oldAction._id});
+            await model.updateOne({_id: docId}, {$inc: {loveCount: -1}});
           }
           return;
         }
@@ -60,13 +60,13 @@ async function processDocAction(model, col, userId, docId, action, value) {
       if (!oldAction) {
         // new vote
         await DocAction.create(newAction);
-        await model.update({_id: docId}, {$inc: {voteCount: 1, voteSum: value}});
+        await model.updateOne({_id: docId}, {$inc: {voteCount: 1, voteSum: value}});
         return;
       }
       // update vote
       const diff = value - oldAction.value;
-      await DocAction.update({_id: oldAction._id}, {$set: {value, date: new Date()}});
-      await model.update({_id: docId}, {$inc: {voteSum: diff}});
+      await DocAction.updateOne({_id: oldAction._id}, {$set: {value, date: new Date()}});
+      await model.updateOne({_id: docId}, {$inc: {voteSum: diff}});
       return;
     }
   }
