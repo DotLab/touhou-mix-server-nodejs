@@ -332,7 +332,7 @@ module.exports = class WebsocketSession {
       {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
       {$project: {user: 0}},
-      {$sort: {score: -1}}]).exec();
+      {$sort: {performance: -1, score: -1}}]).exec();
 
     this.returnSuccess(id, trials);
   }

@@ -488,7 +488,7 @@ module.exports = class Session {
       {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
       {$project: {user: 0}},
-      {$sort: {score: -1}}]).exec();
+      {$sort: {performance: -1, score: -1}}]).exec();
 
     return success(done, trials.map((x) => serializeTrial(x)));
   }
