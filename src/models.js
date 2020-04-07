@@ -1,4 +1,3 @@
-// @ts-nocheck
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
@@ -14,7 +13,7 @@ exports.connectDatabase = async function(database) {
 // mongoose.set('debug', true);
 };
 
-exports.User = mongoose.model('User', {
+exports.User = mongoose.model('User', new mongoose.Schema({
   name: String,
   email: String,
   salt: String,
@@ -43,7 +42,7 @@ exports.User = mongoose.model('User', {
   cCount: Number,
   dCount: Number,
   fCount: Number,
-});
+}));
 
 exports.serializeUser = function(user) {
   const {
@@ -309,7 +308,7 @@ exports.createDefaultMidiComment = function() {
   };
 };
 
-exports.Trial = mongoose.model('Trial', {
+exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
@@ -330,7 +329,7 @@ exports.Trial = mongoose.model('Trial', {
   goodCount: Number,
   badCount: Number,
   missCount: Number,
-});
+}));
 
 function getGradeFromAccuracy(accuracy) {
   if (accuracy == 1) return 'Ω';
@@ -387,7 +386,7 @@ exports.serializeTrial = function(trial) {
   };
 };
 
-exports.DocComment = mongoose.model('DocComment', {
+exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
   docId: ObjectId,
   userId: ObjectId,
   userName: String,
@@ -396,9 +395,9 @@ exports.DocComment = mongoose.model('DocComment', {
   date: Date,
   text: String,
   grade: String,
-});
+}));
 
-exports.Message = mongoose.model('Message', {
+exports.Message = mongoose.model('Message', new mongoose.Schema({
   userId: ObjectId,
   userName: String,
   userAvatarUrl: String,
@@ -407,20 +406,9 @@ exports.Message = mongoose.model('Message', {
   text: String,
   upCount: Number,
   downCount: Number,
-});
+}));
 
-const TestSchema = new mongoose.Schema({
-  title: String,
-  body: String,
-});
-TestSchema.index({
-  title: 'text',
-  body: 'text',
-});
-const Test = mongoose.model('Test', TestSchema);
-Test.syncIndexes().catch((e) => debug(e));
-
-exports.Translation = mongoose.model('Translation', {
+exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   src: String,
   lang: String,
   text: String,
@@ -430,9 +418,9 @@ exports.Translation = mongoose.model('Translation', {
   editorName: String,
 
   active: Boolean,
-});
+}));
 
-exports.Build = mongoose.model('Build', {
+exports.Build = mongoose.model('Build', new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
   uploaderAvatarUrl: String,
@@ -443,7 +431,7 @@ exports.Build = mongoose.model('Build', {
   name: String,
   desc: String,
   path: String,
-});
+}));
 
 exports.serializeBuild = function(doc) {
   const {
@@ -459,7 +447,7 @@ exports.serializeBuild = function(doc) {
   };
 };
 
-exports.Album = mongoose.model('Album', {
+exports.Album = mongoose.model('Album', new mongoose.Schema({
   index: Number,
   name: String,
   desc: String,
@@ -469,7 +457,7 @@ exports.Album = mongoose.model('Album', {
   imagePath: String,
   coverPath: String,
   coverBlurPath: String,
-});
+}));
 
 exports.serializeAlbum = function(doc) {
   const {
@@ -489,7 +477,7 @@ exports.serializeAlbum = function(doc) {
   };
 };
 
-exports.Song = mongoose.model('Song', {
+exports.Song = mongoose.model('Song', new mongoose.Schema({
   albumId: ObjectId,
   albumIndex: Number,
   composerId: ObjectId, // Person
@@ -497,7 +485,7 @@ exports.Song = mongoose.model('Song', {
   name: String,
   desc: String,
   track: Number,
-});
+}));
 
 exports.serializeSong = function(doc) {
   const {
@@ -533,7 +521,7 @@ exports.serializePerson = function(doc) {
   };
 };
 
-exports.Soundfont = mongoose.model('Soundfont', {
+exports.Soundfont = mongoose.model('Soundfont', new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
   uploaderAvatarUrl: String,
@@ -556,7 +544,7 @@ exports.Soundfont = mongoose.model('Soundfont', {
   loveCount: Number,
   voteCount: Number,
   voteSum: Number,
-});
+}));
 
 exports.serializeSoundfont = function(soundfont) {
   const {
@@ -663,7 +651,7 @@ exports.serializePlay = function(play) {
   return play;
 };
 
-exports.DocAction = mongoose.model('DocAction', {
+exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
   userId: ObjectId,
 
   col: String,
@@ -673,4 +661,4 @@ exports.DocAction = mongoose.model('DocAction', {
   value: Number,
 
   date: Date,
-});
+}));
