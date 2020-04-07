@@ -229,6 +229,7 @@ exports.serializeMidi = function(midi) {
     coverBlurPath = album.coverBlurPath;
   }
   return {
+    _id,
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
@@ -397,12 +398,26 @@ exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
   docId: ObjectId,
   userId: ObjectId,
   userName: String,
-  userAvatarUrl: String,
+  userAvatarPath: String,
 
-  date: Date,
   text: String,
-  grade: String,
-}));
+  date: Date,
+}, {collection: 'docComments'}));
+
+exports.serializeDocComment = function(doc) {
+  const {
+    _id,
+    docId,
+    userId, userName, userAvatarPath,
+    text, date,
+  } = doc;
+  return {
+    _id,
+    docId,
+    userId, userName, userAvatarPath, userAvatarUrl: BUCKET_URL + userAvatarPath,
+    text, date,
+  };
+};
 
 /** @type {import('mongoose').Model<Object>} */
 exports.Message = mongoose.model('Message', new mongoose.Schema({

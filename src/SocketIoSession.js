@@ -4,10 +4,11 @@ const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 const mongoose = require('mongoose');
 const sharp = require('sharp');
 const ObjectId = mongoose.Types.ObjectId;
-const exec = require('util').promisify(require('child_process').exec);
-
 const debug = require('debug')('thmix:SocketIoSession');
-
+const exec = require('util').promisify(require('child_process').exec);
+const {
+  commentController,
+} = require('./controllers');
 const {
   User, createDefaultUser, serializeUser,
   Midi, createDefaultMidi, serializeMidi,
@@ -66,7 +67,7 @@ function success(done, data) {
 }
 
 function error(done, data) {
-  debug('    error');
+  debug('    error', data);
   if (typeof done === 'function') done({error: true, data});
   else debug('  done is not a function');
 }
@@ -94,6 +95,17 @@ function genPendingCode() {
 
 function genSessionTokenHash() {
   return crypto.randomBytes(64).toString('base64');
+}
+
+function createRpcHandler(resolver) {
+  return async function(args, done) {
+    try {
+      const res = await resolver(args);
+      return success(done, res);
+    } catch (e) {
+      return error(done, e);
+    }
+  };
 }
 
 const COVER_HEIGHT = 250;
@@ -266,6 +278,9 @@ module.exports = class SocketIoSession {
 
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
+
+    this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
+    this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
   }
 
   listenAppClient() {
@@ -1305,5 +1320,26 @@ module.exports = class SocketIoSession {
     ]).exec();
 
     success(done, trials);
+  }
+
+  async onClWebDocCommentCreate({recaptcha, docId, text}) {
+    recaptcha = String(recaptcha);
+    docId = new ObjectId(docId);
+    text = String(text);
+    debug('  onClWebDocCommentCreate', docId, text);
+
+    const res = await verifyRecaptcha(recaptcha, this.socketIp);
+    if (res !== true) throw codeError(0, 'invalid recaptcha');
+    if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
+
+    await commentController.create({user: this.user, docId, text});
+    return await commentController.list({docId});
+  }
+
+  async onClWebDocCommentList({docId}) {
+    docId = new ObjectId(docId);
+    debug('  onClWebDocCommentList', docId);
+
+    return await commentController.list({docId});
   }
 };
