@@ -364,6 +364,17 @@ exports.serializeTrial = function(trial) {
   };
 };
 
+exports.DocComment = mongoose.model('DocComment', {
+  docId: ObjectId,
+  userId: ObjectId,
+  userName: String,
+  userAvatarUrl: String,
+
+  date: Date,
+  text: String,
+  grade: String,
+});
+
 exports.Message = mongoose.model('Message', {
   userId: ObjectId,
   userName: String,
