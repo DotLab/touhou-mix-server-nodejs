@@ -13,6 +13,7 @@ exports.connectDatabase = async function(database) {
 // mongoose.set('debug', true);
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.User = mongoose.model('User', new mongoose.Schema({
   name: String,
   email: String,
@@ -94,6 +95,7 @@ exports.createDefaultUser = function() {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
   hash: String,
   userId: ObjectId,
@@ -105,6 +107,7 @@ exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
   invalidatedDate: Date,
 }, {collection: 'sessionTokens'}));
 
+/** @type {import('mongoose').Model<Object>} */
 exports.SessionRecord = mongoose.model('SessionRecord', new mongoose.Schema({
   userId: ObjectId,
   tokenId: ObjectId,
@@ -198,6 +201,8 @@ MidiSchema.index({
   sourceSongName: 'text',
   sourceSongNameEng: 'text',
 }, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
 const Midi = mongoose.model('Midi', MidiSchema);
 Midi.syncIndexes().catch((e) => debug(e));
 exports.Midi = Midi;
@@ -308,6 +313,7 @@ exports.createDefaultMidiComment = function() {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   userId: ObjectId,
   midiId: ObjectId,
@@ -386,6 +392,7 @@ exports.serializeTrial = function(trial) {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
   docId: ObjectId,
   userId: ObjectId,
@@ -397,6 +404,7 @@ exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
   grade: String,
 }));
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Message = mongoose.model('Message', new mongoose.Schema({
   userId: ObjectId,
   userName: String,
@@ -408,6 +416,7 @@ exports.Message = mongoose.model('Message', new mongoose.Schema({
   downCount: Number,
 }));
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   src: String,
   lang: String,
@@ -420,6 +429,7 @@ exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   active: Boolean,
 }));
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Build = mongoose.model('Build', new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
@@ -447,6 +457,7 @@ exports.serializeBuild = function(doc) {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Album = mongoose.model('Album', new mongoose.Schema({
   index: Number,
   name: String,
@@ -477,6 +488,7 @@ exports.serializeAlbum = function(doc) {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Song = mongoose.model('Song', new mongoose.Schema({
   albumId: ObjectId,
   albumIndex: Number,
@@ -506,6 +518,7 @@ const PersonSchema = new mongoose.Schema({
   avatarPath: String,
 }, {collection: 'persons'});
 
+/** @type {import('mongoose').Model<Object>} */
 const Person = mongoose.model('Person', PersonSchema);
 exports.Person = Person;
 
@@ -521,6 +534,7 @@ exports.serializePerson = function(doc) {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.Soundfont = mongoose.model('Soundfont', new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
@@ -611,6 +625,8 @@ ResourceSchema.index({
   status: 'text',
   uploaderId: 'text',
 }, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
 const Resource = mongoose.model('Resource', ResourceSchema);
 Resource.syncIndexes().catch((e) => debug(e));
 exports.Resource = Resource;
@@ -651,6 +667,7 @@ exports.serializePlay = function(play) {
   return play;
 };
 
+/** @type {import('mongoose').Model<Object>} */
 exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
   userId: ObjectId,
 
