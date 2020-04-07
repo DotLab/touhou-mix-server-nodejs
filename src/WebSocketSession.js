@@ -1,4 +1,6 @@
+const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketSession');
+const ObjectId = require('mongoose').Types.ObjectId;
 const {
   User, serializeUser,
   Midi, serializeMidi,
@@ -7,8 +9,6 @@ const {
   Soundfont,
   DocAction,
 } = require('./models');
-const crypto = require('crypto');
-const ObjectId = require('mongoose').Types.ObjectId;
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 18;

@@ -1,6 +1,5 @@
 // @ts-nocheck
 const debug = require('debug')('thmix:models');
-
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
 

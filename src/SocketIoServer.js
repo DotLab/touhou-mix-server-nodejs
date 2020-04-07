@@ -1,5 +1,4 @@
 const debug = require('debug')('thmix:SocketIoServer');
-
 const SocketIoSession = require('./SocketIoSession');
 
 const VERSION = 0;

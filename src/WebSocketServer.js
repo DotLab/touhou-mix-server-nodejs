@@ -1,6 +1,6 @@
+const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketServer');
 const WebSocketSession = require('./WebSocketSession');
-const crypto = require('crypto');
 
 module.exports = class WebSocketServer {
   constructor(wsServer, {bucketService, translationService}) {

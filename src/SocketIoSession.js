@@ -1,11 +1,10 @@
 const crypto = require('crypto');
-const sharp = require('sharp');
 const fs = require('fs');
 const MidiParser = require('../node_modules/midi-parser-js/src/midi-parser');
 const mongoose = require('mongoose');
+const sharp = require('sharp');
 const ObjectId = mongoose.Types.ObjectId;
-const util = require('util');
-const exec = util.promisify(require('child_process').exec);
+const exec = require('util').promisify(require('child_process').exec);
 
 const debug = require('debug')('thmix:SocketIoSession');
 

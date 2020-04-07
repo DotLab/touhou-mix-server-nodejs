@@ -1,11 +1,9 @@
-
+const axios = require('axios');
+const mailgunExport = require('mailgun-js');
+const mongoose = require('mongoose');
 const {RECAPTCHA_SECRET, TEST_RECAPTCHA_SECRET, MAILGUN_API_KEY} = require('./secrets');
 
-const axios = require('axios');
-const mongoose = require('mongoose');
-
-const mailgun = require('mailgun-js')({apiKey: MAILGUN_API_KEY, domain: 'mail.thmix.org'});
-
+const mailgun = mailgunExport({apiKey: MAILGUN_API_KEY, domain: 'mail.thmix.org'});
 const env = process.env.NODE_ENV;
 
 exports.verifyRecaptcha = async function(recaptcha, ip) {
