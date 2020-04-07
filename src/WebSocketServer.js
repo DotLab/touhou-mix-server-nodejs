@@ -19,6 +19,10 @@ module.exports = class WebSocketServer {
     wsServer.on('connection', this.connectClient.bind(this));
   }
 
+  async shutdown() {
+    debug('shutdown');
+  }
+
   connectClient(websocket) {
     debug('connectClient');
 

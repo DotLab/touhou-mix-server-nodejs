@@ -30,6 +30,11 @@ module.exports = class SocketIoServer {
     });
   }
 
+  async shutdown() {
+    debug('shutdown');
+    await Promise.all(Object.values(this.sessions).map((x) => x.onDisconnect()));
+  }
+
   /**
    * @param {SocketIoSession} session
    */

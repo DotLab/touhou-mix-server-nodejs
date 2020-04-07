@@ -57,7 +57,7 @@ const translationService = new TranslationService('microvolt-0');
 
 const io = require('socket.io')(portSocketIo);
 const SocketIoServer = require('./SocketIoServer');
-new SocketIoServer(io, storage, tempPath, translationService);
+const socketIoServer = new SocketIoServer(io, storage, tempPath, translationService);
 
 const ws = require('ws');
 
@@ -90,4 +90,35 @@ const BucketService = require('./BucketService');
 const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1');
 
 const WebSocketServer = require('./WebSocketServer');
-new WebSocketServer(wsServer, {bucketService, translationService});
+const webSocketServer = new WebSocketServer(wsServer, {bucketService, translationService});
+
+process.stdin.resume();
+
+async function exitHandler(shouldExit, exitCode) {
+  debug('shutdown', exitCode);
+  try {
+    await socketIoServer.shutdown();
+    await webSocketServer.shutdown();
+  } catch (e) {
+    debug(e);
+  }
+
+  if (shouldExit) process.exit();
+}
+
+process.on('SIGINT', async () => {
+
+});
+
+// do something when app is closing
+process.on('exit', exitHandler.bind(null, false));
+
+// catches ctrl+c event
+process.on('SIGINT', exitHandler.bind(null, true));
+
+// catches "kill pid" (for example: nodemon restart)
+process.on('SIGUSR1', exitHandler.bind(null, true));
+process.on('SIGUSR2', exitHandler.bind(null, true));
+
+// catches uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, true));
