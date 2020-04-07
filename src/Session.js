@@ -490,7 +490,7 @@ module.exports = class Session {
       {$project: {user: 0}},
       {$sort: {score: -1}}]).exec();
 
-    return success(done, trials);
+    return success(done, trials.map((x) => serializeTrial(x)));
   }
 
   async onClWebMidiGet({id}, done) {

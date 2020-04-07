@@ -48,7 +48,7 @@ if (env === 'development') {
   hasher.update('test');
   hasher.update(salt);
   const hash = hasher.digest('base64');
-  User.create({
+  User.findOneAndUpdate({name: 'Test'}, {
     name: 'Test', email: 'test@test.com', salt, hash,
     joinedDate: new Date(), seenDate: new Date(),
   });

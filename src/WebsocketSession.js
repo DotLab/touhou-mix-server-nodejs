@@ -2,7 +2,7 @@ const debug = require('debug')('thmix:WebsocketSession');
 const {
   User, serializeUser,
   Midi, serializeMidi,
-  Trial,
+  Trial, getGradeFromAccuracy, getGradeLevelFromAccuracy,
   Build, serializeBuild,
   Soundfont,
   DocAction,
@@ -248,15 +248,22 @@ module.exports = class WebsocketSession {
       perfectCount, greatCount, goodCount, badCount, missCount,
       version,
     } = trial;
-    const performance = Math.floor(Math.log(score));
-    debug('  clAppTrialUpload', version, hash);
+    const performance = Math.floor(Math.log(score) * accuracy);
+    debug('  clAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
+
+    const gradeLevel = getGradeLevelFromAccuracy(accuracy);
+    const countFieldName = gradeLevel.toLowerCase() + 'Count';
+    const failed = gradeLevel === 'F';
+    const passFailFieldName = failed ? 'failCount' : 'passCount';
+
     this.user = await this.updateUser({
       $inc: {
         trialCount: 1,
-        passCount: 1,
+        [passFailFieldName]: 1,
+        [countFieldName]: 1,
         score,
         combo,
         performance,
@@ -266,7 +273,8 @@ module.exports = class WebsocketSession {
     const midi = await Midi.findOneAndUpdate({hash}, {
       $inc: {
         trialCount: 1,
-        passCount: 1,
+        [passFailFieldName]: 1,
+        [countFieldName]: 1,
         score,
         combo,
         performance,
@@ -280,7 +288,7 @@ module.exports = class WebsocketSession {
       midiId: midi._id,
       date: new Date(),
 
-      score, combo, accuracy, performance,
+      score, combo, accuracy, performance, grade: getGradeFromAccuracy(accuracy),
       perfectCount, greatCount, goodCount, badCount, missCount,
 
       version,

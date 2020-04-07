@@ -149,6 +149,13 @@ const MidiSchema = new mongoose.Schema({
   bCutoff: Number,
   cCutoff: Number,
   dCutoff: Number,
+
+  sCount: Number,
+  aCount: Number,
+  bCount: Number,
+  cCount: Number,
+  dCount: Number,
+  fCount: Number,
 });
 MidiSchema.index({
   uploaderName: 'text',
@@ -185,6 +192,7 @@ exports.serializeMidi = function(midi) {
     score, combo, accuracy,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
   } = midi;
   if (album && album.coverPath) {
@@ -207,6 +215,7 @@ exports.serializeMidi = function(midi) {
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
   };
 };
@@ -288,6 +297,7 @@ exports.Trial = mongoose.model('Trial', {
   combo: Number,
   accuracy: Number,
   performance: Number,
+  grade: String,
 
   perfectCount: Number,
   greatCount: Number,
@@ -296,19 +306,57 @@ exports.Trial = mongoose.model('Trial', {
   missCount: Number,
 });
 
+function getGradeFromAccuracy(accuracy) {
+  if (accuracy == 1) return 'Ω';
+  if (accuracy >= .9999) return 'SSS';
+  if (accuracy >= .999) return 'SS';
+  if (accuracy >= .99) return 'S';
+  if (accuracy >= .98) return 'A+';
+  if (accuracy >= .92) return 'A';
+  if (accuracy >= .9) return 'A-';
+  if (accuracy >= .88) return 'B+';
+  if (accuracy >= .82) return 'B';
+  if (accuracy >= .8) return 'B-';
+  if (accuracy >= .78) return 'C+';
+  if (accuracy >= .72) return 'C';
+  if (accuracy >= .7) return 'C-';
+  if (accuracy >= .68) return 'D+';
+  if (accuracy >= .62) return 'D';
+  if (accuracy >= .6) return 'D-';
+  return 'F';
+}
+exports.getGradeFromAccuracy = getGradeFromAccuracy;
+
+function getGradeLevelFromAccuracy(accuracy) {
+  if (accuracy >= .99) return 'S';
+  if (accuracy >= .9) return 'A';
+  if (accuracy >= .8) return 'B';
+  if (accuracy >= .7) return 'C';
+  if (accuracy >= .6) return 'D';
+  return 'F';
+}
+exports.getGradeLevelFromAccuracy = getGradeLevelFromAccuracy;
+
+function getPassFailFromAccuracy(accuracy) {
+  return accuracy >= .6;
+}
+exports.getPassFailFromAccuracy = getPassFailFromAccuracy;
+
 exports.serializeTrial = function(trial) {
   let {
     id,
     userId, midiId, date, version, score, combo, accuracy,
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+    userName, userAvatarUrl,
   } = trial;
   if (midi) {
     midi = exports.serializeMidi(midi);
   }
   return {
     id,
-    userId, midiId, date, version, score, combo, accuracy,
+    userId, midiId, date, version, score, combo, accuracy, grade: getGradeFromAccuracy(accuracy),
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+    userName, userAvatarUrl,
   };
 };
 

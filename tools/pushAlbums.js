@@ -57,13 +57,17 @@ const {Album, Song, Midi, Person} = require('../src/models');
     }
 
     const midis = await Midi.find({
-      touhouAlbumIndex: song.albumIndex, touhouSongIndex: song.track});
+      touhouAlbumIndex: song.albumIndex, touhouSongIndex: song.track}).sort('touhouSongIndex name');
+    const date = albumDoc.date;
     for (let j = 0; j < midis.length; j++) {
       const midi = midis[j];
       // console.log('update midi', midi.name);
       await Midi.findByIdAndUpdate(midi._id, {
         songId: doc._id,
+        uploadedDate: date,
+        approvedDate: date,
       });
+      date.setSeconds(date.getSeconds() + 1);
     }
   }
 })();
