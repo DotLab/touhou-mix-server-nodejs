@@ -16,12 +16,8 @@ if (env !== 'staging') {
 }
 debug('running as', env, 'on port', port, 'using database', database);
 
-const mongoose = require('mongoose');
-mongoose.connect(`mongodb://localhost:27017/${database}`, {
-  useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
-});
-mongoose.set('useFindAndModify', false);
-// mongoose.set('debug', true);
+const {connectDatabase} = require('./models');
+connectDatabase(database);
 
 const {Storage} = require('@google-cloud/storage');
 const storage = new Storage();

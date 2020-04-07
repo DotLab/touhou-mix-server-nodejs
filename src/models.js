@@ -6,6 +6,15 @@ const ObjectId = mongoose.Schema.Types.ObjectId;
 
 const BUCKET_URL = 'https://storage.thmix.org';
 
+exports.connectDatabase = async function(database) {
+  const mongoose = require('mongoose');
+  await mongoose.connect(`mongodb://localhost:27017/${database}`, {
+    useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
+  });
+  mongoose.set('useFindAndModify', false);
+// mongoose.set('debug', true);
+};
+
 exports.User = mongoose.model('User', {
   name: String,
   email: String,

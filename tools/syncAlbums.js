@@ -1,16 +1,12 @@
-const mongoose = require('mongoose');
-mongoose.connect(`mongodb://localhost:27017/thmix`, {
-  useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
-});
-mongoose.set('useFindAndModify', false);
+/* eslint-disable no-console */
+const {connectDatabase, Album, Song, Midi, Person} = require('../src/models');
 
 const albums = require('../res/touhouAlbums');
 const songs = require('../res/touhouSongs');
 
-const {Album, Song, Midi, Person} = require('../src/models');
-
 (async () => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await connectDatabase('thmix');
+  // require('mongoose').set('debug', true);
 
   for (let i = 0; i < albums.length; i++) {
     const album = albums[i];
@@ -18,11 +14,11 @@ const {Album, Song, Midi, Person} = require('../src/models');
     const doc = await Album.findOne({index: album.index});
     if (!doc) {
       // New album
-      // console.log('new album', album.name);
+      console.log('new album', album.name);
       await Album.create(album);
     } else {
       // Update album
-      // console.log('update album', album.name);
+      console.log('update album', album.name);
       await Album.findByIdAndUpdate(doc._id, album);
     }
   }
@@ -30,6 +26,10 @@ const {Album, Song, Midi, Person} = require('../src/models');
   let zunDoc = await Person.findOne({name: 'ZUN'});
   if (!zunDoc) {
     zunDoc = await Person.create({name: 'ZUN'});
+  }
+  let dmbnDoc = await Person.findOne({name: 'DMBN'});
+  if (!dmbnDoc) {
+    dmbnDoc = await Person.create({name: 'DMBN'});
   }
 
   for (let i = 0; i < songs.length; i++) {
@@ -41,7 +41,7 @@ const {Album, Song, Midi, Person} = require('../src/models');
       albumIndex: song.albumIndex, track: song.track});
     if (!doc) {
       // New song
-      // console.log('new song', song.name);
+      console.log('new song', song.name);
       doc = await Song.create({
         ...song,
         albumId: albumDoc._id,
@@ -49,7 +49,7 @@ const {Album, Song, Midi, Person} = require('../src/models');
       });
     } else {
       // Update song
-      // console.log('update song', song.name);
+      console.log('update song', song.name);
       doc = await Song.findByIdAndUpdate(doc._id, {
         ...song,
         albumId: albumDoc._id,
@@ -61,13 +61,20 @@ const {Album, Song, Midi, Person} = require('../src/models');
     const date = albumDoc.date;
     for (let j = 0; j < midis.length; j++) {
       const midi = midis[j];
-      // console.log('update midi', midi.name);
+      console.log('update midi', midi.name);
       await Midi.findByIdAndUpdate(midi._id, {
         songId: doc._id,
-        uploadedDate: date,
-        approvedDate: date,
       });
-      date.setSeconds(date.getSeconds() + 1);
+      if (midi.artistName === 'DMBN') {
+        await Midi.findByIdAndUpdate(midi._id, {
+          authorId: dmbnDoc._id,
+          uploadedDate: date,
+          approvedDate: date,
+        });
+        date.setSeconds(date.getSeconds() + 1);
+      }
     }
   }
+
+  console.log('done');
 })();
