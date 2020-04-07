@@ -661,4 +661,4 @@ exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
   value: Number,
 
   date: Date,
-}));
+}, {collection: 'docActions'}));
