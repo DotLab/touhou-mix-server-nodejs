@@ -2,19 +2,19 @@ const debug = require('debug')('thmix');
 
 const env = process.env.NODE_ENV;
 
-let port;
-let portWebsocket;
+let portSocketIo;
+let portWebSocket;
 let database;
 if (env !== 'staging') {
-  port = '6003';
-  portWebsocket = 6008;
+  portSocketIo = '6003';
+  portWebSocket = 6008;
   database = 'thmix';
 } else {
-  port = '6004';
-  portWebsocket = 6009;
+  portSocketIo = '6004';
+  portWebSocket = 6009;
   database = 'thmix-staging';
 }
-debug('running as', env, 'on port', port, 'using database', database);
+debug('running as', env, 'on portSocketIo', portSocketIo, 'on portWebSocket', portWebSocket, 'using database', database);
 
 const {connectDatabase} = require('./models');
 connectDatabase(database);
@@ -55,16 +55,16 @@ if (env === 'development') {
 const TranslationService = require('./TranslationService');
 const translationService = new TranslationService('microvolt-0');
 
-const io = require('socket.io')(port);
-const Server = require('./Server');
-new Server(io, storage, tempPath, translationService);
+const io = require('socket.io')(portSocketIo);
+const SocketIoServer = require('./SocketIoServer');
+new SocketIoServer(io, storage, tempPath, translationService);
 
-const WebSocket = require('ws');
+const ws = require('ws');
 
-debug('websocket on', portWebsocket);
+debug('websocket on', portWebSocket);
 
-const wsServer = new WebSocket.Server({
-  port: portWebsocket,
+const wsServer = new ws.Server({
+  port: portWebSocket,
   perMessageDeflate: {
     zlibDeflateOptions: {
       // See zlib defaults.
@@ -89,5 +89,5 @@ const wsServer = new WebSocket.Server({
 const BucketService = require('./BucketService');
 const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1');
 
-const WebsocketServer = require('./WebsocketServer');
-new WebsocketServer(wsServer, {bucketService, translationService});
+const WebSocketServer = require('./WebSocketServer');
+new WebSocketServer(wsServer, {bucketService, translationService});

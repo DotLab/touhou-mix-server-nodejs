@@ -1,10 +1,10 @@
-const debug = require('debug')('thmix:Server');
+const debug = require('debug')('thmix:SocketIoServer');
 
-const Session = require('./Session');
+const SocketIoSession = require('./SocketIoSession');
 
 const VERSION = 0;
 
-module.exports = class Server {
+module.exports = class SocketIoServer {
   constructor(io, storage, tempPath, translationService) {
     /** @type {import('socket.io').Server} */
     this.io = io;
@@ -18,7 +18,7 @@ module.exports = class Server {
     /** @type {import('./TranslationService')} */
     this.translationService = translationService;
 
-    /** @type {Object.<string, Session>} */
+    /** @type {Object.<string, SocketIoSession>} */
     this.sessions = {};
     this.version = VERSION;
 
@@ -26,19 +26,19 @@ module.exports = class Server {
 
     io.on('connection', (socket) => {
       debug('onConnection', socket.id);
-      this.sessions[socket.id] = new Session(this, socket);
+      this.sessions[socket.id] = new SocketIoSession(this, socket);
     });
   }
 
   /**
-   * @param {Session} session
+   * @param {SocketIoSession} session
    */
   addBoardListener(session) {
     this.boardListeners[session.socketId] = session;
   }
 
   /**
-   * @param {Session} session
+   * @param {SocketIoSession} session
    */
   removeBoardListener(session) {
     delete this.boardListeners[session.socketId];

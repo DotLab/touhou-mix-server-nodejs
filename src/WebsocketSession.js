@@ -1,4 +1,4 @@
-const debug = require('debug')('thmix:WebsocketSession');
+const debug = require('debug')('thmix:WebSocketSession');
 const {
   User, serializeUser,
   Midi, serializeMidi,
@@ -72,9 +72,9 @@ async function processDocAction(model, col, userId, docId, action, value) {
   }
 }
 
-module.exports = class WebsocketSession {
+module.exports = class WebSocketSession {
   constructor(server, sessionId, websocket) {
-    /** @type {import('./WebsocketServer')} */
+    /** @type {import('./WebSocketServer')} */
     this.server = server;
     this.sessionId = sessionId;
     this.websocket = websocket;

@@ -7,7 +7,7 @@ const ObjectId = mongoose.Types.ObjectId;
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 
-const debug = require('debug')('thmix:Session');
+const debug = require('debug')('thmix:SocketIoSession');
 
 const {
   User, createDefaultUser, serializeUser,
@@ -26,7 +26,7 @@ const {
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
-/** @typedef {import('./Server')} Server */
+/** @typedef {import('./SocketIoServer')} SocketIoServer */
 /** @typedef {import('socket.io').Socket} Socket */
 
 const INTENT_WEB = 'web';
@@ -100,13 +100,13 @@ function genSessionTokenHash() {
 const COVER_HEIGHT = 250;
 const COVER_WIDTH = 900;
 
-module.exports = class Session {
+module.exports = class SocketIoSession {
   /**
-   * @param {Server} server
+   * @param {SocketIoServer} server
    * @param {Socket} socket
    */
   constructor(server, socket) {
-    /** @type {Server} */
+    /** @type {SocketIoServer} */
     this.server = server;
     /** @type {Socket} */
     this.socket = socket;
