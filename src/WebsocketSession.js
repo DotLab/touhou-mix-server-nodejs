@@ -248,7 +248,7 @@ module.exports = class WebsocketSession {
       perfectCount, greatCount, goodCount, badCount, missCount,
       version,
     } = trial;
-    const performance = Math.floor(Math.log(score) * accuracy);
+    const performance = Math.floor(Math.log(1 + score * accuracy));
     debug('  clAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
@@ -256,13 +256,10 @@ module.exports = class WebsocketSession {
 
     const gradeLevel = getGradeLevelFromAccuracy(accuracy);
     const countFieldName = gradeLevel.toLowerCase() + 'Count';
-    const failed = gradeLevel === 'F';
-    const passFailFieldName = failed ? 'failCount' : 'passCount';
 
     this.user = await this.updateUser({
       $inc: {
         trialCount: 1,
-        [passFailFieldName]: 1,
         [countFieldName]: 1,
         score,
         combo,
@@ -273,7 +270,6 @@ module.exports = class WebsocketSession {
     const midi = await Midi.findOneAndUpdate({hash}, {
       $inc: {
         trialCount: 1,
-        [passFailFieldName]: 1,
         [countFieldName]: 1,
         score,
         combo,

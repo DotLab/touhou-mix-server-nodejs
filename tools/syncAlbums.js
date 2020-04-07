@@ -76,5 +76,5 @@ const songs = require('../res/touhouSongs');
     }
   }
 
-  console.log('done');
+  process.exit(0);
 })();

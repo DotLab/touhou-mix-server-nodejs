@@ -36,6 +36,7 @@ exports.User = mongoose.model('User', {
   playTime: Number,
   performance: Number,
   ranking: Number,
+
   sCount: Number,
   aCount: Number,
   bCount: Number,
@@ -57,6 +58,7 @@ exports.serializeUser = function(user) {
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    passCount: trialCount - fCount, failCount: fCount,
   };
 };
 
@@ -140,8 +142,6 @@ const MidiSchema = new mongoose.Schema({
   }],
 
   trialCount: Number,
-  // upCount: Number,
-  // downCount: Number,
   loveCount: Number,
   voteCount: Number,
   voteSum: Number,
@@ -149,9 +149,6 @@ const MidiSchema = new mongoose.Schema({
   score: Number,
   combo: Number,
   accuracy: Number,
-
-  passCount: Number,
-  failCount: Number,
 
   sCutoff: Number,
   aCutoff: Number,
@@ -196,10 +193,8 @@ exports.serializeMidi = function(midi) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    // trialCount, upCount, downCount, loveCount,
     trialCount, loveCount, voteCount, voteSum,
     score, combo, accuracy,
-    passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
@@ -222,7 +217,7 @@ exports.serializeMidi = function(midi) {
     trialCount, loveCount, voteCount, voteSum,
     upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
-    passCount, failCount,
+    passCount: trialCount - fCount, failCount: fCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     sCount, aCount, bCount, cCount, dCount, fCount,
     hash,

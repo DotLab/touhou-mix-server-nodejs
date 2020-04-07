@@ -33,5 +33,5 @@ const {connectDatabase, Translation} = require('../src/models');
 
   await Translation.updateMany({date: null}, {date: new Date()});
 
-  console.log('done');
+  process.exit(0);
 })();
