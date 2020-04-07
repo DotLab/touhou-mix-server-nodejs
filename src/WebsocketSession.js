@@ -325,7 +325,7 @@ module.exports = class WebsocketSession {
 
     const trials = await Trial.aggregate([
       {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
-      {$sort: {score: -1}},
+      {$sort: {performance: -1, score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
