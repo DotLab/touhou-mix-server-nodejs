@@ -21,6 +21,7 @@
       "ignoreMemberSort": false,
       "memberSyntaxSortOrder": ["none", "all", "multiple", "single"]
     }],
+    "quote-props": ["error", "as-needed"],
     "no-multiple-empty-lines": ["error", {"max": 1}],
     "linebreak-style": "off",
     "require-jsdoc": "off",

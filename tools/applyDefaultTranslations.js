@@ -8,23 +8,23 @@ const {connectDatabase, Translation} = require('../src/models');
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   const docs = await Translation.aggregate([
-    {'$group': {
-      '_id': {
-        'src': '$src',
-        'lang': '$lang',
-        'editorId': '$editorId',
+    {$group: {
+      _id: {
+        src: '$src',
+        lang: '$lang',
+        editorId: '$editorId',
       },
-      'dups': {'$push': '$_id'},
-      'count': {'$sum': 1},
+      dups: {$push: '$_id'},
+      count: {$sum: 1},
     }},
-    {'$match': {'count': {'$gt': 1}}},
+    {$match: {count: {$gt: 1}}},
   ]);
 
   for (const doc of docs) {
     doc.dups.shift();
     if (doc.dups.length > 0) {
       console.log('remove', doc.dups.length);
-      await Translation.remove({'_id': {'$in': doc.dups}});
+      await Translation.remove({_id: {$in: doc.dups}});
     }
   }
 
