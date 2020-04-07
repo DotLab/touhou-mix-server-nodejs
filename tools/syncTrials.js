@@ -73,9 +73,9 @@ async function syncDocs(model, fieldName) {
   await connectDatabase('thmix');
   // require('mongoose').set('debug', true);
 
-  await Trial.aggregate([
+  await Trial.updateMany({}, [
     {$set: {
-      performance: {$floor: {$ln: {$add: [1, {$multiply: ['$score', '$accuracy']}]}}},
+      performance: {$floor: {$multiply: [{$ln: {$add: [1, '$score']}}, {$pow: ['$accuracy', 2]}]}},
     }},
   ]);
 
