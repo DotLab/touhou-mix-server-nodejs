@@ -324,6 +324,7 @@ exports.Trial = mongoose.model('Trial', {
   accuracy: Number,
   performance: Number,
   grade: String,
+  gradeLevel: String,
 
   perfectCount: Number,
   greatCount: Number,
@@ -380,7 +381,8 @@ exports.serializeTrial = function(trial) {
   }
   return {
     id,
-    userId, midiId, date, version, score, combo, accuracy, grade: getGradeFromAccuracy(accuracy),
+    userId, midiId, date, version, score, combo, accuracy,
+    grade: getGradeFromAccuracy(accuracy), gradeLevel: getGradeLevelFromAccuracy(accuracy),
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
     userName, userAvatarUrl,
   };
