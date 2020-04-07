@@ -36,18 +36,20 @@ if (fs.existsSync(tempPath)) {
 
 if (env === 'development') {
   // create test user
-  const {User} = require('./models');
-  User.deleteMany({name: 'Test'}).exec();
-  const crypto = require('crypto');
-  const salt = crypto.randomBytes(256).toString('base64');
-  const hasher = crypto.createHash('sha512');
-  hasher.update('test');
-  hasher.update(salt);
-  const hash = hasher.digest('base64');
-  User.findOneAndUpdate({name: 'Test'}, {
-    name: 'Test', email: 'test@test.com', salt, hash,
-    joinedDate: new Date(), seenDate: new Date(),
-  });
+  (async function() {
+    debug('create test user');
+    const crypto = require('crypto');
+    const salt = crypto.randomBytes(256).toString('base64');
+    const hasher = crypto.createHash('sha512');
+    hasher.update('test');
+    hasher.update(salt);
+    const hash = hasher.digest('base64');
+    const {User} = require('./models');
+    await User.findOneAndUpdate({name: 'Test'}, {
+      name: 'Test', email: 'test@test.com', salt, hash,
+      joinedDate: new Date(), seenDate: new Date(),
+    }, {upsert: true});
+  })();
 }
 
 const TranslationService = require('./TranslationService');
