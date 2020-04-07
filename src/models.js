@@ -202,7 +202,7 @@ exports.serializeMidi = function(midi) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, loveCount,
+    trialCount, loveCount, voteCount, voteSum,
     upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     passCount, failCount,

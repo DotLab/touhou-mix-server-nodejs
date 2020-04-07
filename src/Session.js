@@ -528,7 +528,7 @@ module.exports = class Session {
       pipeline.push({$match: {status: status}});
     }
     pipeline.push({$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}});
-    pipeline.push({$unwind: {path: '$song'}});
+    pipeline.push({$unwind: {path: '$song', preserveNullAndEmptyArrays: true}});
     if (albumId) {
       pipeline.push({$match: {'song.albumId': new ObjectId(albumId)}});
     }
