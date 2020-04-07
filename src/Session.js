@@ -21,9 +21,10 @@ const {
   Resource, createDefaultResource, serializeResource,
   Trial, serializeTrial, serializePlay,
   Translation,
+  SessionToken, SessionRecord,
 } = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
 /** @typedef {import('./Server')} Server */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -54,6 +55,10 @@ const SOUND = 'sound';
 const TRIAL_SCORING_VERSION = 3;
 
 const ERROR_FORBIDDEN = 'no you cannot';
+
+function codeError(code, error) {
+  return `${error} (${code})`;
+}
 
 function success(done, data) {
   debug('    success');
@@ -88,6 +93,10 @@ function genPendingCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
+function genSessionTokenHash() {
+  return crypto.randomBytes(64).toString('base64');
+}
+
 const COVER_HEIGHT = 250;
 const COVER_WIDTH = 900;
 
@@ -108,8 +117,11 @@ module.exports = class Session {
 
     this.user = null;
     this.pendingCode = null;
+    this.sessionToken = null;
+    this.sessionRecord = null;
 
     socket.on('cl_handshake', this.onClHandshake.bind(this));
+    socket.on('disconnect', this.onDisconnect.bind(this));
   }
 
   updateUser(spec) {
@@ -181,10 +193,22 @@ module.exports = class Session {
     success(done, {version: this.server.version});
   }
 
+  async onDisconnect() {
+    debug('  onDisconnect', this.socketId);
+
+    if (this.sessionRecord) {
+      this.sessionRecord = await SessionRecord.findByIdAndUpdate(this.sessionRecord._id, {$set: {endDate: new Date()}}, {new: true});
+      await User.updateOne({_id: this.user._id}, {$inc: {onlineTime: getTimeBetween(this.sessionRecord.endDate, this.sessionRecord.startDate)}});
+      debug('    user', this.user.name, getTimeBetween(this.sessionRecord.endDate, this.sessionRecord.startDate) / 1000);
+    }
+    this.server.disposeSession(this.socketId);
+  }
+
   listenWebClient() {
     this.socket.on('cl_web_user_register', this.onClWebUserRegister.bind(this));
     this.socket.on('cl_web_user_register_pre', this.onClWebUserRegisterPre.bind(this));
     this.socket.on('cl_web_user_login', this.onClWebUserLogin.bind(this));
+    this.socket.on('cl_web_user_resume_session', this.onClWebUserResumeSession.bind(this));
     this.socket.on('cl_web_user_get', this.onClWebUserGet.bind(this));
     this.socket.on('cl_web_user_list', this.onClWebUserList.bind(this));
     this.socket.on('cl_web_user_update_bio', this.onClWebUserUpdateBio.bind(this));
@@ -294,16 +318,46 @@ module.exports = class Session {
     if (res !== true) return error(done, 'invalid recaptcha');
 
     const user = await User.findOne({email: email});
-    if (!user) return error(done, 'wrong combination');
+    if (!user) return error(done, 'email not found');
 
     const hash = calcPasswordHash(password, user.salt);
-    if (hash === user.hash) { // matched
-      this.user = user;
-      this.user = await this.updateUser({seenDate: new Date()});
-      return success(done, serializeUser(this.user));
-    }
+    if (hash !== user.hash) return error(done, 'wrong password');
 
-    error(done, 'wrong combination');
+    this.user = user;
+    this.user = await this.updateUser({seenDate: new Date()});
+
+    await SessionToken.updateMany({userId: user._id, valid: true}, {
+      $set: {valid: false, invalidatedDate: new Date()},
+    });
+    this.sessionToken = await SessionToken.create({
+      userId: user._id, hash: genSessionTokenHash(), valid: true,
+      issuedDate: new Date(), seenDate: new Date(),
+    });
+    this.sessionRecord = await SessionRecord.create({
+      userId: user._id, tokenId: this.sessionToken._id,
+      startDate: new Date(), endDate: new Date(),
+    });
+
+    return success(done, {
+      ...serializeUser(this.user),
+      sessionTokenHash: this.sessionToken.hash,
+    });
+  }
+
+  async onClWebUserResumeSession({hash}, done) {
+    debug('  onClWebUserResumeSession', hash);
+
+    const token = await SessionToken.findOne({hash, valid: true});
+    if (!token) return error(done, codeError(0, ERROR_FORBIDDEN));
+    this.sessionToken = await SessionToken.findByIdAndUpdate({_id: token._id}, {$set: {seenDate: new Date()}}, {new: true});
+
+    this.user = await User.findByIdAndUpdate(this.sessionToken.userId, {$set: {seenDate: new Date()}}, {new: true});
+    this.sessionRecord = await SessionRecord.create({
+      userId: this.user._id, tokenId: this.sessionToken._id,
+      startDate: new Date(), endDate: new Date(),
+    });
+
+    return success(done, serializeUser(this.user));
   }
 
   async onClWebUserGet({id}, done) {

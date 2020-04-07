@@ -57,6 +57,11 @@ module.exports = class Server {
     if (typeof this.sessions[socketId] === 'object') {
       this.sessions[socketId].socket.disconnect();
     } else debug('ending mal-formed session', socketId);
+    this.disposeSession(socketId);
+  }
+
+  disposeSession(socketId) {
+    debug('disposeSession', socketId);
     delete this.sessions[socketId];
     delete this.boardListeners[socketId];
   }

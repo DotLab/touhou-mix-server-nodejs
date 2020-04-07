@@ -34,6 +34,7 @@ exports.User = mongoose.model('User', {
   accuracy: Number,
 
   playTime: Number,
+  onlineTime: Number,
   performance: Number,
   ranking: Number,
 
@@ -50,14 +51,16 @@ exports.serializeUser = function(user) {
     id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
-    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    playTime, onlineTime,
+    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
-    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    playTime, onlineTime,
+    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
     passCount: trialCount - fCount, failCount: fCount,
   };
 };
@@ -92,6 +95,25 @@ exports.createDefaultUser = function() {
     fCount: 0,
   };
 };
+
+exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
+  hash: String,
+  userId: ObjectId,
+  valid: Boolean,
+
+  issuedDate: Date,
+  seenDate: Date,
+  // expiredDate: Date,
+  invalidatedDate: Date,
+}, {collection: 'sessionTokens'}));
+
+exports.SessionRecord = mongoose.model('SessionRecord', new mongoose.Schema({
+  userId: ObjectId,
+  tokenId: ObjectId,
+
+  startDate: Date,
+  endDate: Date,
+}, {collection: 'sessionRecords'}));
 
 const MidiSchema = new mongoose.Schema({
   uploaderId: ObjectId,

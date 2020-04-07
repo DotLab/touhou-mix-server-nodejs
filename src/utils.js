@@ -111,3 +111,17 @@ function orGet(obj, path, val) {
   return get(obj, path, null);
 }
 exports.orGet = orGet;
+
+/**
+ * Get time between dates in ms.
+ * @param {Date|String} end
+ * @param {Date|String} start
+ * @return {Number}
+ */
+function getTimeBetween(end, start) {
+  if (!end || !start) return 0;
+  if (typeof end === 'string') end = new Date(end);
+  if (typeof start === 'string') start = new Date(start);
+  return end.getTime() - start.getTime();
+}
+exports.getTimeBetween = getTimeBetween;
