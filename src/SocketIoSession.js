@@ -518,17 +518,11 @@ module.exports = class SocketIoSession {
     const {
       id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      derivedFromId, supersedeId, supersededById,
+      derivedFromId, supersedeId,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
-
-    if (supersedeId && supersedeId !== '') {
-      const supersedeDoc = await Midi.findById(update.supersedeId);
-      if (!supersedeDoc) return error(done, 'not found');
-      if (supersedeDoc.uploaderId != this.user.id) return error(done, ERROR_FORBIDDEN);
-    }
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
@@ -537,20 +531,18 @@ module.exports = class SocketIoSession {
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId: authorId ? authorId : undefined,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      derivedFromId, supersedeId, supersededById,
+      derivedFromId, supersedeId,
     });
 
-    if (derivedFromId === '') {
-      update.derivedFromId = null;
-    }
-    if (supersedeId === '') {
-      update.supersedeId = null;
-    }
-    midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
-    if (update.supersedeId) {
-      await Midi.findByIdAndUpdate(update.supersedeId, {$set: {supersededById: id, status: 'DEAD'}});
+    if (supersedeId) {
+      const supersedeDoc = await Midi.findById(supersedeId);
+      if (!supersedeDoc) return error(done, 'not found');
+      if (!supersedeDoc.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
+      await Midi.findByIdAndUpdate(supersedeId, {$set: {
+        supersededById: midi._id, status: 'DEAD', deadDate: new Date()}});
     }
 
+    midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeMidi(midi));
   }
 

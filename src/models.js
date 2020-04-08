@@ -138,6 +138,7 @@ const MidiSchema = new mongoose.Schema({
   // meta
   uploadedDate: Date,
   approvedDate: Date,
+  deadDate: Date,
   // status
   status: String, // PENDING, APPROVED, DEAD
   // source
@@ -204,9 +205,6 @@ MidiSchema.index({
   sourceAlbumNameEng: 'text',
   sourceSongName: 'text',
   sourceSongNameEng: 'text',
-  derivedFromId: 'text',
-  supersedeId: 'text',
-  supersededById: 'text',
 }, {name: 'text_index'});
 
 /** @type {import('mongoose').Model<Object>} */
