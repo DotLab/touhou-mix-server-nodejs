@@ -518,6 +518,7 @@ module.exports = class SocketIoSession {
     const {
       id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
+      derivedFromId, supersedeId, supersededById,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -530,9 +531,13 @@ module.exports = class SocketIoSession {
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId: authorId ? authorId : undefined,
       sourceArtistName, sourceAlbumName, sourceSongName,
+      derivedFromId, supersedeId, supersededById,
     });
 
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
+    if (update.supersedeId) {
+      await Midi.findByIdAndUpdate(update.supersedeId, {$set: {supersededById: id, status: 'DEAD'}});
+    }
     success(done, serializeMidi(midi));
   }
 
