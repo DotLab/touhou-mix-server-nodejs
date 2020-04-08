@@ -281,10 +281,27 @@ module.exports = class SocketIoSession {
 
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
+
+    this.socket.on('ClWebServerStatus', createRpcHandler(this.onClWebServerStatus.bind(this)));
   }
 
   listenAppClient() {
     this.socket.on('cl_app_user_login', this.onClAppUserLogin.bind(this));
+  }
+
+  async onClWebServerStatus(_) {
+    debug('  onClWebServerStatus');
+
+    const playerCount = await User.count({});
+    const onlineCount = Object.keys(this.server.sessions).length;
+    if (this.server.peakOnlineCount < onlineCount) {
+      this.server.peakOnlineCount = onlineCount;
+    }
+    return {
+      revision: this.server.revision,
+      playerCount, onlineCount,
+      peakOnlineCount: this.server.peakOnlineCount,
+    };
   }
 
   async onClWebUserRegisterPre({recaptcha, name, email}, done) {

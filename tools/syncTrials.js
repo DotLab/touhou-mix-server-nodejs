@@ -75,7 +75,7 @@ async function syncDocs(model, fieldName) {
 
   await Trial.updateMany({}, [
     {$set: {
-      performance: {$floor: {$multiply: [{$ln: {$add: [1, '$score']}}, {$pow: ['$accuracy', 2]}]}},
+      performance: {$multiply: [{$ln: {$add: [1, '$score']}}, {$pow: ['$accuracy', 2]}]},
     }},
   ]);
 

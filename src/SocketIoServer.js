@@ -23,6 +23,12 @@ module.exports = class SocketIoServer {
 
     this.boardListeners = {};
 
+    this.peakOnlineCount = 0;
+
+    this.revision = require('child_process')
+        .execSync('git rev-parse HEAD')
+        .toString().trim();
+
     io.on('connection', (socket) => {
       debug('onConnection', socket.id);
       this.sessions[socket.id] = new SocketIoSession(this, socket);
