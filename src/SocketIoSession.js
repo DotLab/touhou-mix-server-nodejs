@@ -54,6 +54,10 @@ const IMAGE = 'image';
 const SOUND = 'sound';
 const TRIAL_SCORING_VERSION = 3;
 
+const TOUHOU = 'touhou';
+const ANIME = 'anime';
+const GAME = 'game';
+
 const ERROR_FORBIDDEN = 'no you cannot';
 
 function codeError(code, error) {
@@ -879,7 +883,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebSongUpdate', update.id);
 
     const {
-      id, albumId, composerId, name, desc, track,
+      id, albumId, composerId, name, category, desc, track,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -889,7 +893,7 @@ module.exports = class SocketIoSession {
     if (!doc) return error(done, 'not found');
 
     update = filterUndefinedKeys({
-      albumId, composerId, name, desc, track,
+      albumId, composerId, name, desc, track, category,
     });
 
     doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});

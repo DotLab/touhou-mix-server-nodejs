@@ -508,6 +508,7 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
   albumId: ObjectId,
   albumIndex: Number,
   composerId: ObjectId, // Person
+  category: String, // TOUHOU, ANIME, GAME
 
   name: String,
   desc: String,
@@ -517,12 +518,12 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
 exports.serializeSong = function(doc) {
   const {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   } = doc;
 
   return {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   };
 };
 
