@@ -831,7 +831,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebAlbumUpdate', update.id);
 
     const {
-      id, name, desc, category
+      id, name, desc, category,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
