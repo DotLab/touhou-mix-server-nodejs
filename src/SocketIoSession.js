@@ -24,7 +24,7 @@ const {
   SessionToken, SessionRecord,
 } = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
 /** @typedef {import('./SocketIoServer')} SocketIoServer */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -857,13 +857,11 @@ module.exports = class SocketIoSession {
     let doc = await Album.findById(id);
     if (!doc) return error(done, 'not found');
 
-    update = filterUndefinedKeys({
-      name, desc,
+    update = deleteEmptyKeys({
+      name, desc, category,
     });
 
-    update.category = category === '-1' ? '' : category;
     doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
-
     success(done, serializeAlbum(doc));
   }
 

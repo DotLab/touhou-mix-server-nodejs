@@ -489,7 +489,7 @@ exports.serializeBuild = function(doc) {
 exports.Album = mongoose.model('Album', new mongoose.Schema({
   index: Number,
   name: String,
-  category: String, // TOUHOU, ANIME, GAME
+  category: String, // touhou, anime, game
   desc: String,
   date: Date,
   abbr: String,
