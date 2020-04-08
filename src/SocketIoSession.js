@@ -534,10 +534,17 @@ module.exports = class SocketIoSession {
       derivedFromId, supersedeId, supersededById,
     });
 
+    if (derivedFromId === '') {
+      update.derivedFromId = null;
+    }
+    if (supersedeId === '') {
+      update.supersedeId = null;
+    }
     midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
     if (update.supersedeId) {
       await Midi.findByIdAndUpdate(update.supersedeId, {$set: {supersededById: id, status: 'DEAD'}});
     }
+
     success(done, serializeMidi(midi));
   }
 
