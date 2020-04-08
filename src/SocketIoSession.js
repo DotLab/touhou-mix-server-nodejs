@@ -523,6 +523,10 @@ module.exports = class SocketIoSession {
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
+    if (supersedeId !== '') {
+      const supersedeDoc = await Midi.findById(update.supersedeId);
+      if (supersedeDoc.uploaderId != this.user.id) return error(done, ERROR_FORBIDDEN);
+    }
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
