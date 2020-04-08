@@ -458,6 +458,7 @@ exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   src: String,
   lang: String,
   text: String,
+  namespace: String,
 
   date: Date,
   editorId: ObjectId,

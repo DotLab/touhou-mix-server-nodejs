@@ -240,8 +240,6 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
 
-    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
-
     this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
     this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
     this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
@@ -268,6 +266,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
 
+    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
 
@@ -682,11 +681,11 @@ module.exports = class SocketIoSession {
     error(done, 'wrong combination');
   }
 
-  async onClWebTranslate({src, lang}, done) {
-    debug('  onClWebTranslate', src, lang);
+  async onClWebTranslate({src, lang, namespace}, done) {
+    debug('  onClWebTranslate', src, lang, namespace);
 
     try {
-      const text = await this.server.translationService.translate(src, lang);
+      const text = await this.server.translationService.translate(src, lang, namespace);
       return success(done, text);
     } catch (e) {
       debug(e);
@@ -696,23 +695,14 @@ module.exports = class SocketIoSession {
 
   async onClWebTranslationList({lang}, done) {
     debug('  onClWebTranslationList', lang);
-    return success(done, await Translation.find({lang, active: true}).sort({src: 1}).lean());
+    return success(done, await Translation.find({lang, active: true}).sort({namespace: 1, src: 1}).lean());
   }
 
-  async onClWebTranslationUpdate({lang, src, text}, done) {
+  async onClWebTranslationUpdate({lang, src, text, namespace}, done) {
     debug('  onClWebTranslationUpdate', lang, src, text);
     if (!this.checkUserRole(ROLE_TRANSLATION_MOD)) return error(done, ERROR_FORBIDDEN);
 
-    await Translation.updateMany({lang, src}, {$set: {active: false}});
-    await Translation.updateOne({
-      lang, src, editorId: this.user._id,
-    }, {
-      lang, src, text,
-      editorId: this.user._id,
-      editorName: this.user.name,
-      active: true,
-      date: new Date(),
-    }, {upsert: true});
+    await this.server.translationService.update(this.user, src, lang, namespace, text);
 
     return success(done);
   }
