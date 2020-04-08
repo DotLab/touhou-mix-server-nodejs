@@ -12,6 +12,7 @@ const {connectDatabase, Translation} = require('../src/models');
       _id: {
         src: '$src',
         lang: '$lang',
+        namespace: '$namespace',
         editorId: '$editorId',
       },
       dups: {$push: '$_id'},

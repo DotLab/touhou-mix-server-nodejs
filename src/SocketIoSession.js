@@ -10,6 +10,13 @@ const {
   commentController,
 } = require('./controllers');
 const {
+  ROLE_MIDI_MOD,
+  ROLE_MIDI_ADMIN,
+  ROLE_TRANSLATION_MOD,
+  ROLE_SITE_OWNER,
+  checkUserRole,
+} = require('./services/RoleService');
+const {
   User, createDefaultUser, serializeUser,
   Midi, createDefaultMidi, serializeMidi,
   Message,
@@ -24,7 +31,7 @@ const {
   SessionToken, SessionRecord,
 } = require('./models');
 
-const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
+const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
 /** @typedef {import('./SocketIoServer')} SocketIoServer */
 /** @typedef {import('socket.io').Socket} Socket */
@@ -34,21 +41,6 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
-
-const ROLE_MIDI_MOD = 'midi-mod';
-const ROLE_MIDI_ADMIN = 'midi-admin';
-const ROLE_TRANSLATION_MOD = 'translation-mod';
-const ROLE_SITE_OWNER = 'site-owner';
-const ROLE_ROOT = 'root';
-
-const ROLE_PARENT_DICT = {
-  [ROLE_MIDI_MOD]: ROLE_MIDI_ADMIN,
-  [ROLE_MIDI_ADMIN]: ROLE_SITE_OWNER,
-
-  [ROLE_TRANSLATION_MOD]: ROLE_SITE_OWNER,
-
-  [ROLE_SITE_OWNER]: ROLE_ROOT,
-};
 
 const IMAGE = 'image';
 const SOUND = 'sound';
@@ -251,8 +243,6 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_board_stop_message_update', this.onClWebBoardStopMessageUpdate.bind(this));
     this.socket.on('cl_web_board_send_message', this.onClWebBoardSendMessage.bind(this));
 
-    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
-
     this.socket.on('cl_web_build_get', this.onClWebBuildGet.bind(this));
     this.socket.on('cl_web_build_upload', this.onClWebBuildUpload.bind(this));
     this.socket.on('cl_web_build_update', this.onClWebBuildUpdate.bind(this));
@@ -279,6 +269,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
 
+    this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
 
@@ -521,17 +512,11 @@ module.exports = class SocketIoSession {
     const {
       id, name, desc, artistName, artistUrl, albumId, songId, authorId,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      derivedFromId, supersedeId, supersededById,
+      derivedFromId, supersedeId,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
-
-    if (supersedeId && supersedeId !== '') {
-      const supersedeDoc = await Midi.findById(update.supersedeId);
-      if (!supersedeDoc) return error(done, 'not found');
-      if (supersedeDoc.uploaderId != this.user.id) return error(done, ERROR_FORBIDDEN);
-    }
 
     let midi = await Midi.findById(id);
     if (!midi) return error(done, 'not found');
@@ -540,20 +525,18 @@ module.exports = class SocketIoSession {
     update = filterUndefinedKeys({
       name, desc, artistName, artistUrl, albumId, songId, authorId: authorId ? authorId : undefined,
       sourceArtistName, sourceAlbumName, sourceSongName,
-      derivedFromId, supersedeId, supersededById,
+      derivedFromId, supersedeId,
     });
 
-    if (derivedFromId === '') {
-      update.derivedFromId = null;
-    }
-    if (supersedeId === '') {
-      update.supersedeId = null;
-    }
-    midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
-    if (update.supersedeId) {
-      await Midi.findByIdAndUpdate(update.supersedeId, {$set: {supersededById: id, status: 'DEAD'}});
+    if (supersedeId) {
+      const supersedeDoc = await Midi.findById(supersedeId);
+      if (!supersedeDoc) return error(done, 'not found');
+      if (!supersedeDoc.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
+      await Midi.findByIdAndUpdate(supersedeId, {$set: {
+        supersededById: midi._id, status: 'DEAD', deadDate: new Date()}});
     }
 
+    midi = await Midi.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeMidi(midi));
   }
 
@@ -614,7 +597,7 @@ module.exports = class SocketIoSession {
       {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
     ]);
     const midi = await query.exec();
-    success(done, serializeMidi(midi[0]));
+    success(done, serializeMidi(midi[0], {user: this.user}));
   }
 
   async onClWebMidiList({albumId, songId, status, sort, page, search}, done) {
@@ -626,6 +609,9 @@ module.exports = class SocketIoSession {
     const pipeline = [];
     if (search) {
       pipeline.push({$match: {$text: {$search: search}}});
+    }
+    if (status !== 'DEAD') {
+      pipeline.push({$match: {$expr: {$ne: ['$status', 'DEAD']}}});
     }
     if (songId) {
       pipeline.push({$match: {songId: new ObjectId(songId)}});
@@ -698,11 +684,11 @@ module.exports = class SocketIoSession {
     error(done, 'wrong combination');
   }
 
-  async onClWebTranslate({src, lang}, done) {
-    debug('  onClWebTranslate', src, lang);
+  async onClWebTranslate({src, lang, namespace}, done) {
+    debug('  onClWebTranslate', src, lang, namespace);
 
     try {
-      const text = await this.server.translationService.translate(src, lang);
+      const text = await this.server.translationService.translate(src, lang, namespace);
       return success(done, text);
     } catch (e) {
       debug(e);
@@ -712,23 +698,14 @@ module.exports = class SocketIoSession {
 
   async onClWebTranslationList({lang}, done) {
     debug('  onClWebTranslationList', lang);
-    return success(done, await Translation.find({lang, active: true}).sort({src: 1}).lean());
+    return success(done, await Translation.find({lang, active: true}).sort({namespace: 1, src: 1}).lean());
   }
 
-  async onClWebTranslationUpdate({lang, src, text}, done) {
+  async onClWebTranslationUpdate({lang, src, text, namespace}, done) {
     debug('  onClWebTranslationUpdate', lang, src, text);
     if (!this.checkUserRole(ROLE_TRANSLATION_MOD)) return error(done, ERROR_FORBIDDEN);
 
-    await Translation.updateMany({lang, src}, {$set: {active: false}});
-    await Translation.updateOne({
-      lang, src, editorId: this.user._id,
-    }, {
-      lang, src, text,
-      editorId: this.user._id,
-      editorName: this.user.name,
-      active: true,
-      date: new Date(),
-    }, {upsert: true});
+    await this.server.translationService.update(this.user, src, lang, namespace, text);
 
     return success(done);
   }
@@ -807,17 +784,7 @@ module.exports = class SocketIoSession {
   }
 
   checkUserRole(role) {
-    if (!this.user || !this.user.roles || this.user.roles.length == 0) {
-      return false;
-    }
-    if (this.user.roles.includes(role)) {
-      return true;
-    }
-    while (ROLE_PARENT_DICT[role]) {
-      role = ROLE_PARENT_DICT[role];
-      if (this.user.roles.includes(role)) return true;
-    }
-    return false;
+    return checkUserRole(this.user && this.user.roles, role);
   }
 
   async onClWebAlbumCreate(done) {
@@ -869,7 +836,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebAlbumUpdate', update.id);
 
     const {
-      id, name, desc,
+      id, name, desc, category,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -878,8 +845,8 @@ module.exports = class SocketIoSession {
     let doc = await Album.findById(id);
     if (!doc) return error(done, 'not found');
 
-    update = filterUndefinedKeys({
-      name, desc,
+    update = deleteEmptyKeys({
+      name, desc, category,
     });
 
     doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});

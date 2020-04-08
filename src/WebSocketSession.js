@@ -2,6 +2,9 @@ const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketSession');
 const ObjectId = require('mongoose').Types.ObjectId;
 const {
+  NAMESPACE_UI_APP,
+} = require('./TranslationService');
+const {
   User, serializeUser,
   Midi, serializeMidi,
   Trial, getGradeFromAccuracy, getGradeLevelFromAccuracy,
@@ -337,11 +340,14 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, trials);
   }
 
-  async clAppTranslate(id, {src, lang}) {
+  async clAppTranslate(id, {src, lang, namespace}) {
     debug('  clAppTranslate', src, lang);
+    if (!namespace) {
+      namespace = NAMESPACE_UI_APP;
+    }
 
     try {
-      const text = await this.server.translationService.translate(src, lang);
+      const text = await this.server.translationService.translate(src, lang, namespace);
       return this.returnSuccess(id, text);
     } catch (e) {
       debug(e);

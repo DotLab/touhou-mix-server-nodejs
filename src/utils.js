@@ -60,6 +60,24 @@ exports.filterUndefinedKeys = function(obj) {
   }, {});
 };
 
+exports.deleteEmptyKeys = function(obj) {
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined || obj[key] === null || obj[key] === '') {
+      delete obj[key];
+    }
+  }
+  return obj;
+};
+
+exports.deleteFalsyKeys = function(obj) {
+  for (const key of Object.keys(obj)) {
+    if (!obj[key]) {
+      delete obj[key];
+    }
+  }
+  return obj;
+};
+
 /**
  * "-approvedDate" -> {approvedDate: -1}
  * @param {String} sort

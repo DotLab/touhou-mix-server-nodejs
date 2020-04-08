@@ -1,6 +1,7 @@
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
+const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
 
@@ -138,6 +139,7 @@ const MidiSchema = new mongoose.Schema({
   // meta
   uploadedDate: Date,
   approvedDate: Date,
+  deadDate: Date,
   // status
   status: String, // PENDING, APPROVED, DEAD
   // source
@@ -204,9 +206,6 @@ MidiSchema.index({
   sourceAlbumNameEng: 'text',
   sourceSongName: 'text',
   sourceSongNameEng: 'text',
-  derivedFromId: 'text',
-  supersedeId: 'text',
-  supersededById: 'text',
 }, {name: 'text_index'});
 
 /** @type {import('mongoose').Model<Object>} */
@@ -214,7 +213,7 @@ const Midi = mongoose.model('Midi', MidiSchema);
 Midi.syncIndexes().catch((e) => debug(e));
 exports.Midi = Midi;
 
-exports.serializeMidi = function(midi) {
+exports.serializeMidi = function(midi, context) {
   let {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -254,6 +253,7 @@ exports.serializeMidi = function(midi) {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    canEdit: context && context.user && checkUserRole(context.user.roles, ROLE_MIDI_MOD),
     derivedFromId, supersedeId, supersededById,
     mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
     coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
@@ -458,6 +458,7 @@ exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   src: String,
   lang: String,
   text: String,
+  namespace: String,
 
   date: Date,
   editorId: ObjectId,
@@ -498,6 +499,7 @@ exports.serializeBuild = function(doc) {
 exports.Album = mongoose.model('Album', new mongoose.Schema({
   index: Number,
   name: String,
+  category: String, // touhou, anime, game
   desc: String,
   date: Date,
   abbr: String,
@@ -510,14 +512,14 @@ exports.Album = mongoose.model('Album', new mongoose.Schema({
 exports.serializeAlbum = function(doc) {
   const {
     _id,
-    name, desc, date, abbr,
+    name, desc, date, abbr, category,
     songs, composer,
     coverPath, coverBlurPath,
   } = doc;
   return {
     _id,
     id: _id,
-    name, desc, date, abbr,
+    name, desc, date, abbr, category,
     songs, composer,
     coverPath, coverBlurPath,
     coverUrl: coverPath ? BUCKET_URL + coverPath : null,
@@ -539,12 +541,12 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
 exports.serializeSong = function(doc) {
   const {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   } = doc;
 
   return {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   };
 };
 
