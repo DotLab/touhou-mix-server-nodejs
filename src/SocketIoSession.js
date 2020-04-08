@@ -54,10 +54,6 @@ const IMAGE = 'image';
 const SOUND = 'sound';
 const TRIAL_SCORING_VERSION = 3;
 
-const TOUHOU = 'touhou';
-const ANIME = 'anime';
-const GAME = 'game';
-
 const ERROR_FORBIDDEN = 'no you cannot';
 
 function codeError(code, error) {
@@ -835,7 +831,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebAlbumUpdate', update.id);
 
     const {
-      id, name, desc,
+      id, name, desc, category
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -848,7 +844,9 @@ module.exports = class SocketIoSession {
       name, desc,
     });
 
+    update.category = category === '-1' ? '' : category;
     doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
+
     success(done, serializeAlbum(doc));
   }
 
@@ -883,7 +881,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebSongUpdate', update.id);
 
     const {
-      id, albumId, composerId, name, category, desc, track,
+      id, albumId, composerId, name, desc, track,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -893,7 +891,7 @@ module.exports = class SocketIoSession {
     if (!doc) return error(done, 'not found');
 
     update = filterUndefinedKeys({
-      albumId, composerId, name, desc, track, category,
+      albumId, composerId, name, desc, track,
     });
 
     doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
