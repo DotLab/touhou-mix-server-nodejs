@@ -10,6 +10,13 @@ const {
   commentController,
 } = require('./controllers');
 const {
+  ROLE_MIDI_MOD,
+  ROLE_MIDI_ADMIN,
+  ROLE_TRANSLATION_MOD,
+  ROLE_SITE_OWNER,
+  checkUserRole,
+} = require('./services/RoleService');
+const {
   User, createDefaultUser, serializeUser,
   Midi, createDefaultMidi, serializeMidi,
   Message,
@@ -34,21 +41,6 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
-
-const ROLE_MIDI_MOD = 'midi-mod';
-const ROLE_MIDI_ADMIN = 'midi-admin';
-const ROLE_TRANSLATION_MOD = 'translation-mod';
-const ROLE_SITE_OWNER = 'site-owner';
-const ROLE_ROOT = 'root';
-
-const ROLE_PARENT_DICT = {
-  [ROLE_MIDI_MOD]: ROLE_MIDI_ADMIN,
-  [ROLE_MIDI_ADMIN]: ROLE_SITE_OWNER,
-
-  [ROLE_TRANSLATION_MOD]: ROLE_SITE_OWNER,
-
-  [ROLE_SITE_OWNER]: ROLE_ROOT,
-};
 
 const IMAGE = 'image';
 const SOUND = 'sound';
@@ -603,7 +595,7 @@ module.exports = class SocketIoSession {
       {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
     ]);
     const midi = await query.exec();
-    success(done, serializeMidi(midi[0]));
+    success(done, serializeMidi(midi[0], {user: this.user}));
   }
 
   async onClWebMidiList({albumId, songId, status, sort, page, search}, done) {
@@ -799,17 +791,7 @@ module.exports = class SocketIoSession {
   }
 
   checkUserRole(role) {
-    if (!this.user || !this.user.roles || this.user.roles.length == 0) {
-      return false;
-    }
-    if (this.user.roles.includes(role)) {
-      return true;
-    }
-    while (ROLE_PARENT_DICT[role]) {
-      role = ROLE_PARENT_DICT[role];
-      if (this.user.roles.includes(role)) return true;
-    }
-    return false;
+    return checkUserRole(this.user && this.user.roles, role);
   }
 
   async onClWebAlbumCreate(done) {

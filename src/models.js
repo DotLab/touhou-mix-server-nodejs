@@ -1,6 +1,7 @@
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
+const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
 
@@ -212,7 +213,7 @@ const Midi = mongoose.model('Midi', MidiSchema);
 Midi.syncIndexes().catch((e) => debug(e));
 exports.Midi = Midi;
 
-exports.serializeMidi = function(midi) {
+exports.serializeMidi = function(midi, context) {
   let {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -252,6 +253,7 @@ exports.serializeMidi = function(midi) {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    canEdit: context && context.user && checkUserRole(context.user.roles, ROLE_MIDI_MOD),
     derivedFromId, supersedeId, supersededById,
     mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
     coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
