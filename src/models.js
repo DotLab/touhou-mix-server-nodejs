@@ -228,6 +228,19 @@ exports.serializeMidi = function(midi) {
     coverPath = album.coverPath;
     coverBlurPath = album.coverBlurPath;
   }
+  score = score || 0;
+  combo = combo || 0;
+  accuracy = accuracy || 0;
+  trialCount = trialCount || 0;
+  loveCount = loveCount || 0;
+  voteCount = voteCount || 0;
+  voteSum = voteSum || 0;
+  sCount = sCount || 0;
+  aCount = aCount || 0;
+  bCount = bCount || 0;
+  cCount = cCount || 0;
+  dCount = dCount || 0;
+  fCount = fCount || 0;
   return {
     _id,
     id: _id,
