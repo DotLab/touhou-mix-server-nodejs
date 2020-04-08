@@ -678,6 +678,8 @@ exports.serializePlay = function(play) {
   if ((midi && midi.coverPath) || (album && album.coverPath)) {
     const coverPath = (midi && midi.coverPath) || (album && album.coverPath);
     play.coverUrl = BUCKET_URL + coverPath;
+    const coverBlurPath = (midi && midi.coverBlurPath) || (album && album.coverBlurPath);
+    play.coverBlurUrl = BUCKET_URL + coverBlurPath;
   }
   return play;
 };
