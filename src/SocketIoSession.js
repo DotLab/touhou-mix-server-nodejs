@@ -537,7 +537,7 @@ module.exports = class SocketIoSession {
     if (supersedeId) {
       const supersedeDoc = await Midi.findById(supersedeId);
       if (!supersedeDoc) return error(done, 'not found');
-      if (!supersedeDoc.uploaderId.equals(this.user.id)) return error(done, ERROR_FORBIDDEN);
+      if (!supersedeDoc.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_ADMIN)) return error(done, ERROR_FORBIDDEN);
       await Midi.findByIdAndUpdate(supersedeId, {$set: {
         supersededById: midi._id, status: 'DEAD', deadDate: new Date()}});
     }

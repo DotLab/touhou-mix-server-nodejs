@@ -48,6 +48,7 @@ if (env === 'development') {
     await User.findOneAndUpdate({name: 'Test'}, {
       name: 'Test', email: 'test@test.com', salt, hash,
       joinedDate: new Date(), seenDate: new Date(),
+      roles: ['site-owner'],
     }, {upsert: true});
   })();
 }
