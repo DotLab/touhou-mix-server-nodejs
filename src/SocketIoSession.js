@@ -616,6 +616,9 @@ module.exports = class SocketIoSession {
     if (search) {
       pipeline.push({$match: {$text: {$search: search}}});
     }
+    if (status !== 'DEAD') {
+      pipeline.push({$match: {$expr: {$ne: ['$status', 'DEAD']}}});
+    }
     if (songId) {
       pipeline.push({$match: {songId: new ObjectId(songId)}});
     }
