@@ -498,6 +498,7 @@ exports.serializeBuild = function(doc) {
 exports.Album = mongoose.model('Album', new mongoose.Schema({
   index: Number,
   name: String,
+  category: String, // touhou, anime, game
   desc: String,
   date: Date,
   abbr: String,
@@ -510,14 +511,14 @@ exports.Album = mongoose.model('Album', new mongoose.Schema({
 exports.serializeAlbum = function(doc) {
   const {
     _id,
-    name, desc, date, abbr,
+    name, desc, date, abbr, category,
     songs, composer,
     coverPath, coverBlurPath,
   } = doc;
   return {
     _id,
     id: _id,
-    name, desc, date, abbr,
+    name, desc, date, abbr, category,
     songs, composer,
     coverPath, coverBlurPath,
     coverUrl: coverPath ? BUCKET_URL + coverPath : null,
@@ -539,12 +540,12 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
 exports.serializeSong = function(doc) {
   const {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   } = doc;
 
   return {
     id,
-    albumId, composerId, name, desc, track,
+    albumId, composerId, name, desc, track, category,
   };
 };
 
