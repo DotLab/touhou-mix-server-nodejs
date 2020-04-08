@@ -248,7 +248,7 @@ module.exports = class WebSocketSession {
       perfectCount, greatCount, goodCount, badCount, missCount,
       version,
     } = trial;
-    const performance = Math.floor(Math.log(1 + score) * Math.pow(accuracy, 2));
+    const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
     debug('  clAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
