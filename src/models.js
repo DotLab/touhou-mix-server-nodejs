@@ -138,6 +138,7 @@ const MidiSchema = new mongoose.Schema({
   // meta
   uploadedDate: Date,
   approvedDate: Date,
+  deadDate: Date,
   // status
   status: String, // PENDING, APPROVED, DEAD
   // source
@@ -147,6 +148,10 @@ const MidiSchema = new mongoose.Schema({
   sourceAlbumNameEng: String,
   sourceSongName: String,
   sourceSongNameEng: String,
+
+  derivedFromId: ObjectId,
+  supersedeId: ObjectId,
+  supersededById: ObjectId,
 
   songId: ObjectId,
   authorId: ObjectId,
@@ -212,6 +217,7 @@ exports.serializeMidi = function(midi) {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    derivedFromId, supersedeId, supersededById,
     mp3Path,
     coverPath, coverBlurPath,
     uploadedDate, approvedDate, status,
@@ -246,6 +252,7 @@ exports.serializeMidi = function(midi) {
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, desc, artistName, artistUrl, authorId, songId, song, album,
+    derivedFromId, supersedeId, supersededById,
     mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
     coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
     coverBlurPath, coverBlurUrl: coverBlurPath && BUCKET_URL + coverBlurPath,
