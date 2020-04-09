@@ -44,8 +44,10 @@ class TranslationService {
 TranslationService.NAMESPACE_UI = 'ui';
 TranslationService.NAMESPACE_UI_APP = 'ui.app';
 TranslationService.NAMESPACE_UI_WEB = 'ui.web';
+TranslationService.NAMESPACE_UI_VOLATILE = 'ui.volatile';
 TranslationService.NAMESPACE_NAME_SONG = 'name.song';
 TranslationService.NAMESPACE_NAME_ALBUM = 'name.album';
+TranslationService.NAMESPACE_NAME_ARTIFACT = 'name.artifact';
 TranslationService.NAMESPACE_TEXT_USER = 'text.user';
 TranslationService.NAMESPACE_UNKNOWN = 'unknown';
 

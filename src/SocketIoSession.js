@@ -41,6 +41,7 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+const ALBUM_LIST_PAGE_LIMIT = 10;
 
 const IMAGE = 'image';
 const SOUND = 'sound';
@@ -249,6 +250,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
     this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+    this.socket.on('cl_web_album_info_list', this.onClWebAlbumInfoList.bind(this));
 
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
@@ -972,8 +974,9 @@ module.exports = class SocketIoSession {
     success(done, serializePerson(doc));
   }
 
-  async onClWebAlbumList(done) {
-    debug('  onClWebAlbumList');
+  async onClWebAlbumList({page}, done) {
+    page = parseInt(page || 0);
+    debug('  onClWebAlbumList', page);
 
     const albums = await Song.aggregate([
       {$lookup: {from: 'persons', localField: 'composerId', foreignField: '_id', as: 'composer'}},
@@ -984,8 +987,17 @@ module.exports = class SocketIoSession {
       {$addFields: {'album.songs': '$songs'}},
       {$replaceRoot: {newRoot: '$album'}},
       {$sort: {date: -1}},
+      {$skip: page * ALBUM_LIST_PAGE_LIMIT},
+      {$limit: ALBUM_LIST_PAGE_LIMIT},
     ]);
 
+    success(done, albums.map((x) => serializeAlbum(x)));
+  }
+
+  async onClWebAlbumInfoList(done) {
+    debug('  onClWebAlbumInfoList');
+
+    const albums = await Album.find({}).sort('-date');
     success(done, albums.map((x) => serializeAlbum(x)));
   }
 
