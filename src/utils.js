@@ -1,11 +1,9 @@
-
+const axios = require('axios');
+const mailgunExport = require('mailgun-js');
+const mongoose = require('mongoose');
 const {RECAPTCHA_SECRET, TEST_RECAPTCHA_SECRET, MAILGUN_API_KEY} = require('./secrets');
 
-const axios = require('axios');
-const mongoose = require('mongoose');
-
-const mailgun = require('mailgun-js')({apiKey: MAILGUN_API_KEY, domain: 'mail.thmix.org'});
-
+const mailgun = mailgunExport({apiKey: MAILGUN_API_KEY, domain: 'mail.thmix.org'});
 const env = process.env.NODE_ENV;
 
 exports.verifyRecaptcha = async function(recaptcha, ip) {
@@ -61,3 +59,85 @@ exports.filterUndefinedKeys = function(obj) {
     return acc;
   }, {});
 };
+
+exports.deleteEmptyKeys = function(obj) {
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined || obj[key] === null || obj[key] === '') {
+      delete obj[key];
+    }
+  }
+  return obj;
+};
+
+exports.deleteFalsyKeys = function(obj) {
+  for (const key of Object.keys(obj)) {
+    if (!obj[key]) {
+      delete obj[key];
+    }
+  }
+  return obj;
+};
+
+/**
+ * "-approvedDate" -> {approvedDate: -1}
+ * @param {String} sort
+ * @return {Object.<String, Number>}
+ */
+exports.sortQueryToSpec = function(sort) {
+  const spec = {};
+  sort.split(' ').forEach((x) => {
+    if (x[0] === '-') {
+      spec[x.substring(1)] = -1;
+    } else {
+      if (x[0] === '+') {
+        spec[x.substring(1)] = 1;
+      } else {
+        spec[x] = 1;
+      }
+    }
+  });
+  return spec;
+};
+
+/*
+ * @param {any} obj
+ * @param {String} path
+ * @param {any} val
+ * @return {any}
+ */
+function get(obj, path, val) {
+  if (!obj) return val;
+  const segs = path.split('.');
+  for (let i = 0; i < segs.length; i++) {
+    obj = obj[segs[i]];
+    if (!obj) return val;
+  }
+  return obj;
+}
+exports.get = get;
+
+/**
+ * @param {any} obj
+ * @param {String} path
+ * @param {any} val
+ * @return {any}
+ */
+function orGet(obj, path, val) {
+  if (val) return val;
+  return get(obj, path, null);
+}
+exports.orGet = orGet;
+
+/**
+ * Get time between dates in ms.
+ * @param {Date|String} end
+ * @param {Date|String} start
+ * @return {Number}
+ */
+function getTimeBetween(end, start) {
+  if (!end || !start) return 0;
+  if (typeof end === 'string') end = new Date(end);
+  if (typeof start === 'string') start = new Date(start);
+  return end.getTime() - start.getTime();
+}
+exports.getTimeBetween = getTimeBetween;

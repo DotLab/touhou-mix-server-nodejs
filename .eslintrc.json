@@ -9,8 +9,20 @@
   "parserOptions": {
     "sourceType": "module",
     "ecmaVersion": 9
-},
+  },
+  "plugins": [
+    "sort-requires"
+  ],
   "rules": {
+    "sort-requires/sort-requires": 2,
+    "sort-imports": ["error", {
+      "ignoreCase": false,
+      "ignoreDeclarationSort": false,
+      "ignoreMemberSort": false,
+      "memberSyntaxSortOrder": ["none", "all", "multiple", "single"]
+    }],
+    "quote-props": ["error", "as-needed"],
+    "no-multiple-empty-lines": ["error", {"max": 1}],
     "linebreak-style": "off",
     "require-jsdoc": "off",
     "max-len": "off"

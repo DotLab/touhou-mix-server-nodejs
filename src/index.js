@@ -2,25 +2,22 @@ const debug = require('debug')('thmix');
 
 const env = process.env.NODE_ENV;
 
-let port;
-let portWebsocket;
+let portSocketIo;
+let portWebSocket;
 let database;
 if (env !== 'staging') {
-  port = '6003';
-  portWebsocket = 6008;
+  portSocketIo = '6003';
+  portWebSocket = 6008;
   database = 'thmix';
 } else {
-  port = '6004';
-  portWebsocket = 6009;
+  portSocketIo = '6004';
+  portWebSocket = 6009;
   database = 'thmix-staging';
 }
-debug('running as', env, 'on port', port, 'using database', database);
+debug('running as', env, 'on portSocketIo', portSocketIo, 'on portWebSocket', portWebSocket, 'using database', database);
 
-const mongoose = require('mongoose');
-mongoose.connect(`mongodb://localhost:27017/${database}`, {
-  useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
-});
-mongoose.set('useFindAndModify', false);
+const {connectDatabase} = require('./models');
+connectDatabase(database);
 
 const {Storage} = require('@google-cloud/storage');
 const storage = new Storage();
@@ -37,54 +34,38 @@ if (fs.existsSync(tempPath)) {
   fs.mkdirSync(tempPath);
 }
 
-// const {User, Midi} = require('./models');
-// User.deleteMany({}).exec();
-// Midi.deleteMany({}).exec();
-// const crypto = require('crypto');
-// function genPasswordSalt() {
-//   return crypto.randomBytes(256).toString('base64');
-// }
-// function calcPasswordHash(password, salt) {
-//   const hasher = crypto.createHash('sha512');
-//   hasher.update(password);
-//   hasher.update(salt);
-//   return hasher.digest('base64');
-// }
-// const salt = genPasswordSalt();
-// const hash = calcPasswordHash('test', salt);
-// User.create({
-//   name: 'Test', email: 'test@test.com', salt, hash,
-//   joinedDate: new Date(), seenDate: new Date(),
-
-//   playCount: 0,
-//   totalScores: 0,
-//   maxCombo: 0,
-//   accuracy: 0,
-
-//   totalPlayTime: 0,
-//   weightedPp: 0,
-//   ranking: 0,
-//   sCount: 0,
-//   aCount: 0,
-//   bCount: 0,
-//   cCount: 0,
-//   dCount: 0,
-//   fCount: 0,
-// });
+if (env === 'development') {
+  // create test user
+  (async function() {
+    debug('create test user');
+    const crypto = require('crypto');
+    const salt = crypto.randomBytes(256).toString('base64');
+    const hasher = crypto.createHash('sha512');
+    hasher.update('test');
+    hasher.update(salt);
+    const hash = hasher.digest('base64');
+    const {User} = require('./models');
+    await User.findOneAndUpdate({name: 'Test'}, {
+      name: 'Test', email: 'test@test.com', salt, hash,
+      joinedDate: new Date(), seenDate: new Date(),
+      roles: ['site-owner'],
+    }, {upsert: true});
+  })();
+}
 
 const TranslationService = require('./TranslationService');
 const translationService = new TranslationService('microvolt-0');
 
-const io = require('socket.io')(port);
-const Server = require('./Server');
-new Server(io, storage, tempPath, translationService);
+const io = require('socket.io')(portSocketIo);
+const SocketIoServer = require('./SocketIoServer');
+const socketIoServer = new SocketIoServer(io, storage, tempPath, translationService);
 
-const WebSocket = require('ws');
+const ws = require('ws');
 
-debug('websocket on', portWebsocket);
+debug('websocket on', portWebSocket);
 
-const wsServer = new WebSocket.Server({
-  port: portWebsocket,
+const wsServer = new ws.Server({
+  port: portWebSocket,
   perMessageDeflate: {
     zlibDeflateOptions: {
       // See zlib defaults.
@@ -109,5 +90,36 @@ const wsServer = new WebSocket.Server({
 const BucketService = require('./BucketService');
 const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1');
 
-const WebsocketServer = require('./WebsocketServer');
-new WebsocketServer(wsServer, {bucketService, translationService});
+const WebSocketServer = require('./WebSocketServer');
+const webSocketServer = new WebSocketServer(wsServer, {bucketService, translationService});
+
+process.stdin.resume();
+
+async function exitHandler(shouldExit, exitCode) {
+  debug('shutdown', exitCode);
+  try {
+    await socketIoServer.shutdown();
+    await webSocketServer.shutdown();
+  } catch (e) {
+    debug(e);
+  }
+
+  if (shouldExit) process.exit();
+}
+
+process.on('SIGINT', async () => {
+
+});
+
+// do something when app is closing
+process.on('exit', exitHandler.bind(null, false));
+
+// catches ctrl+c event
+process.on('SIGINT', exitHandler.bind(null, true));
+
+// catches "kill pid" (for example: nodemon restart)
+process.on('SIGUSR1', exitHandler.bind(null, true));
+process.on('SIGUSR2', exitHandler.bind(null, true));
+
+// catches uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, true));

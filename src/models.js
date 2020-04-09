@@ -1,10 +1,21 @@
-// @ts-nocheck
 const debug = require('debug')('thmix:models');
-
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
+const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
 
-exports.User = mongoose.model('User', {
+const BUCKET_URL = 'https://storage.thmix.org';
+
+exports.connectDatabase = async function(database) {
+  const mongoose = require('mongoose');
+  await mongoose.connect(`mongodb://localhost:27017/${database}`, {
+    useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true,
+  });
+  mongoose.set('useFindAndModify', false);
+// mongoose.set('debug', true);
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.User = mongoose.model('User', new mongoose.Schema({
   name: String,
   email: String,
   salt: String,
@@ -23,28 +34,34 @@ exports.User = mongoose.model('User', {
   accuracy: Number,
 
   playTime: Number,
+  onlineTime: Number,
   performance: Number,
   ranking: Number,
+
   sCount: Number,
   aCount: Number,
   bCount: Number,
   cCount: Number,
   dCount: Number,
   fCount: Number,
-});
+}));
 
 exports.serializeUser = function(user) {
   const {
     id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
-    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    playTime, onlineTime,
+    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
-    playTime, performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
+    playTime, onlineTime,
+    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    passCount: trialCount - fCount, failCount: fCount,
   };
 };
 
@@ -79,6 +96,27 @@ exports.createDefaultUser = function() {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
+exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
+  hash: String,
+  userId: ObjectId,
+  valid: Boolean,
+
+  issuedDate: Date,
+  seenDate: Date,
+  // expiredDate: Date,
+  invalidatedDate: Date,
+}, {collection: 'sessionTokens'}));
+
+/** @type {import('mongoose').Model<Object>} */
+exports.SessionRecord = mongoose.model('SessionRecord', new mongoose.Schema({
+  userId: ObjectId,
+  tokenId: ObjectId,
+
+  startDate: Date,
+  endDate: Date,
+}, {collection: 'sessionRecords'}));
+
 const MidiSchema = new mongoose.Schema({
   uploaderId: ObjectId,
   uploaderName: String,
@@ -92,13 +130,16 @@ const MidiSchema = new mongoose.Schema({
   artistName: String,
   artistNameEng: String,
   artistUrl: String,
+
+  mp3Path: String,
+  imagePath: String,
   coverPath: String,
-  coverUrl: String,
   coverBlurPath: String,
-  coverBlurUrl: String,
+
   // meta
   uploadedDate: Date,
   approvedDate: Date,
+  deadDate: Date,
   // status
   status: String, // PENDING, APPROVED, DEAD
   // source
@@ -108,6 +149,13 @@ const MidiSchema = new mongoose.Schema({
   sourceAlbumNameEng: String,
   sourceSongName: String,
   sourceSongNameEng: String,
+
+  derivedFromId: ObjectId,
+  supersedeId: ObjectId,
+  supersededById: ObjectId,
+
+  songId: ObjectId,
+  authorId: ObjectId,
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
@@ -123,26 +171,26 @@ const MidiSchema = new mongoose.Schema({
   }],
 
   trialCount: Number,
-  upCount: Number,
-  downCount: Number,
   loveCount: Number,
-
-  avgScore: Number,
-  avgCombo: Number,
-  avgAccuracy: Number,
+  voteCount: Number,
+  voteSum: Number,
 
   score: Number,
   combo: Number,
   accuracy: Number,
-
-  passCount: Number,
-  failCount: Number,
 
   sCutoff: Number,
   aCutoff: Number,
   bCutoff: Number,
   cCutoff: Number,
   dCutoff: Number,
+
+  sCount: Number,
+  aCount: Number,
+  bCount: Number,
+  cCount: Number,
+  dCount: Number,
+  fCount: Number,
 });
 MidiSchema.index({
   uploaderName: 'text',
@@ -159,40 +207,70 @@ MidiSchema.index({
   sourceSongName: 'text',
   sourceSongNameEng: 'text',
 }, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
 const Midi = mongoose.model('Midi', MidiSchema);
 Midi.syncIndexes().catch((e) => debug(e));
 exports.Midi = Midi;
 
-exports.serializeMidi = function(midi) {
-  const {
-    id,
+exports.serializeMidi = function(midi, context) {
+  let {
+    _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
-    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
+    derivedFromId, supersedeId, supersededById,
+    mp3Path,
+    coverPath, coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, upCount, downCount, loveCount,
-    // avgScore, avgCombo, avgAccuracy,
+    trialCount, loveCount, voteCount, voteSum,
     score, combo, accuracy,
-    passCount, failCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
   } = midi;
+  if (author) {
+    author = exports.serializePerson(author);
+  }
+  if (album && album.coverPath) {
+    coverPath = album.coverPath;
+    coverBlurPath = album.coverBlurPath;
+  }
+  score = score || 0;
+  combo = combo || 0;
+  accuracy = accuracy || 0;
+  trialCount = trialCount || 0;
+  loveCount = loveCount || 0;
+  voteCount = voteCount || 0;
+  voteSum = voteSum || 0;
+  sCount = sCount || 0;
+  aCount = aCount || 0;
+  bCount = bCount || 0;
+  cCount = cCount || 0;
+  dCount = dCount || 0;
+  fCount = fCount || 0;
   return {
-    id,
+    _id,
+    id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl,
-    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
+    canEdit: context && context.user && checkUserRole(context.user.roles, ROLE_MIDI_MOD),
+    derivedFromId, supersedeId, supersededById,
+    mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
+    coverPath, coverUrl: coverPath && BUCKET_URL + coverPath,
+    coverBlurPath, coverBlurUrl: coverBlurPath && BUCKET_URL + coverBlurPath,
     uploadedDate, approvedDate, status,
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, upCount, downCount, loveCount,
+    trialCount, loveCount, voteCount, voteSum,
+    upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
-    passCount, failCount,
+    passCount: trialCount - fCount, failCount: fCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
+    sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
   };
 };
@@ -261,10 +339,12 @@ exports.createDefaultMidiComment = function() {
   };
 };
 
-exports.Trial = mongoose.model('Trial', {
+/** @type {import('mongoose').Model<Object>} */
+exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   userId: ObjectId,
   midiId: ObjectId,
   date: Date,
+  version: Number,
 
   // history: [{note: Number, time: Number, delta: Number}],
 
@@ -273,15 +353,99 @@ exports.Trial = mongoose.model('Trial', {
   combo: Number,
   accuracy: Number,
   performance: Number,
+  grade: String,
+  gradeLevel: String,
 
   perfectCount: Number,
   greatCount: Number,
   goodCount: Number,
   badCount: Number,
   missCount: Number,
-});
+}));
 
-exports.Message = mongoose.model('Message', {
+function getGradeFromAccuracy(accuracy) {
+  if (accuracy == 1) return 'Ω';
+  if (accuracy >= .9999) return 'SSS';
+  if (accuracy >= .999) return 'SS';
+  if (accuracy >= .99) return 'S';
+  if (accuracy >= .98) return 'A+';
+  if (accuracy >= .92) return 'A';
+  if (accuracy >= .9) return 'A-';
+  if (accuracy >= .88) return 'B+';
+  if (accuracy >= .82) return 'B';
+  if (accuracy >= .8) return 'B-';
+  if (accuracy >= .78) return 'C+';
+  if (accuracy >= .72) return 'C';
+  if (accuracy >= .7) return 'C-';
+  if (accuracy >= .68) return 'D+';
+  if (accuracy >= .62) return 'D';
+  if (accuracy >= .6) return 'D-';
+  return 'F';
+}
+exports.getGradeFromAccuracy = getGradeFromAccuracy;
+
+function getGradeLevelFromAccuracy(accuracy) {
+  if (accuracy >= .99) return 'S';
+  if (accuracy >= .9) return 'A';
+  if (accuracy >= .8) return 'B';
+  if (accuracy >= .7) return 'C';
+  if (accuracy >= .6) return 'D';
+  return 'F';
+}
+exports.getGradeLevelFromAccuracy = getGradeLevelFromAccuracy;
+
+function getPassFailFromAccuracy(accuracy) {
+  return accuracy >= .6;
+}
+exports.getPassFailFromAccuracy = getPassFailFromAccuracy;
+
+exports.serializeTrial = function(trial) {
+  let {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+    userName, userAvatarUrl,
+  } = trial;
+  if (midi) {
+    midi = exports.serializeMidi(midi);
+  }
+  return {
+    id,
+    userId, midiId, date, version, score, combo, accuracy,
+    grade: getGradeFromAccuracy(accuracy), gradeLevel: getGradeLevelFromAccuracy(accuracy),
+    performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
+    userName, userAvatarUrl,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
+  docId: ObjectId,
+  userId: ObjectId,
+  userName: String,
+  userAvatarPath: String,
+
+  text: String,
+  date: Date,
+}, {collection: 'docComments'}));
+
+exports.serializeDocComment = function(doc) {
+  const {
+    _id,
+    docId,
+    userId, userName, userAvatarPath,
+    text, date,
+  } = doc;
+  return {
+    _id,
+    docId,
+    userId, userName, userAvatarPath, userAvatarUrl: BUCKET_URL + userAvatarPath,
+    text, date,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Message = mongoose.model('Message', new mongoose.Schema({
   userId: ObjectId,
   userName: String,
   userAvatarUrl: String,
@@ -290,24 +454,193 @@ exports.Message = mongoose.model('Message', {
   text: String,
   upCount: Number,
   downCount: Number,
-});
+}));
 
-const TestSchema = new mongoose.Schema({
-  title: String,
-  body: String,
-});
-TestSchema.index({
-  title: 'text',
-  body: 'text',
-});
-const Test = mongoose.model('Test', TestSchema);
-Test.syncIndexes().catch((e) => debug(e));
-
-exports.Translation = mongoose.model('Translation', {
+/** @type {import('mongoose').Model<Object>} */
+exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   src: String,
   lang: String,
   text: String,
-});
+  namespace: String,
+
+  date: Date,
+  editorId: ObjectId,
+  editorName: String,
+
+  active: Boolean,
+}));
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Build = mongoose.model('Build', new mongoose.Schema({
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  build: Number,
+  version: String,
+  name: String,
+  desc: String,
+  path: String,
+}));
+
+exports.serializeBuild = function(doc) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path,
+  } = doc;
+  const url = BUCKET_URL + path;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    date, build, version, name, desc, path, url,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Album = mongoose.model('Album', new mongoose.Schema({
+  index: Number,
+  name: String,
+  category: String, // touhou, anime, game
+  desc: String,
+  date: Date,
+  abbr: String,
+
+  imagePath: String,
+  coverPath: String,
+  coverBlurPath: String,
+}));
+
+exports.serializeAlbum = function(doc) {
+  const {
+    _id,
+    name, desc, date, abbr, category,
+    songs, composer,
+    coverPath, coverBlurPath,
+  } = doc;
+  return {
+    _id,
+    id: _id,
+    name, desc, date, abbr, category,
+    songs, composer,
+    coverPath, coverBlurPath,
+    coverUrl: coverPath ? BUCKET_URL + coverPath : null,
+    coverBlurUrl: coverBlurPath ? BUCKET_URL + coverBlurPath : null,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Song = mongoose.model('Song', new mongoose.Schema({
+  albumId: ObjectId,
+  albumIndex: Number,
+  composerId: ObjectId, // Person
+
+  name: String,
+  desc: String,
+  track: Number,
+}));
+
+exports.serializeSong = function(doc) {
+  const {
+    id,
+    albumId, composerId, name, desc, track, category,
+  } = doc;
+
+  return {
+    id,
+    albumId, composerId, name, desc, track, category,
+  };
+};
+
+const PersonSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  desc: String,
+  avatarPath: String,
+}, {collection: 'persons'});
+
+/** @type {import('mongoose').Model<Object>} */
+const Person = mongoose.model('Person', PersonSchema);
+exports.Person = Person;
+
+exports.serializePerson = function(doc) {
+  const {
+    id,
+    name, url, desc, avatarPath,
+  } = doc;
+  const avatarUrl = avatarPath ? BUCKET_URL + avatarPath : null;
+  return {
+    id,
+    name, url, desc, avatarPath, avatarUrl,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Soundfont = mongoose.model('Soundfont', new mongoose.Schema({
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  name: String,
+  nameEng: String,
+  desc: String,
+  hash: String,
+  path: String,
+  coverPath: String,
+  coverUrl: String,
+  coverBlurPath: String,
+  coverBlurUrl: String,
+
+  uploadedDate: Date,
+  status: String, // PENDING, APPROVED, DEAD
+
+  // upCount: Number,
+  // downCount: Number,
+  loveCount: Number,
+  voteCount: Number,
+  voteSum: Number,
+}));
+
+exports.serializeSoundfont = function(soundfont) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, name,
+    nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    // upCount, downCount, loveCount,
+    loveCount, voteCount, voteSum,
+  } = soundfont;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl,
+    name, nameEng, desc, hash, path, uploadedDate, status,
+    coverPath, coverUrl, coverBlurPath, coverBlurUrl,
+    loveCount,
+    upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
+  };
+};
+
+exports.createDefaultSoundfont = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    nameEng: '',
+    desc: '',
+    hash: '',
+    path: '',
+
+    uploadedDate: null,
+    status: 'PENDING',
+
+    upCount: 0,
+    downCount: 0,
+    loveCount: 0,
+  };
+};
 
 const ResourceSchema = new mongoose.Schema({
   uploaderId: ObjectId,
@@ -334,6 +667,8 @@ ResourceSchema.index({
   status: 'text',
   uploaderId: 'text',
 }, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
 const Resource = mongoose.model('Resource', ResourceSchema);
 Resource.syncIndexes().catch((e) => debug(e));
 exports.Resource = Resource;
@@ -350,15 +685,13 @@ exports.createDefaultResource = function() {
 };
 
 exports.serializeResource = function(resource) {
-  const bucketName = 'scarletea';
   const {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
     name, type, desc, hash, path,
     uploadedDate, approvedDate, status, tags,
   } = resource;
-  const url = 'https://storage.googleapis.com/' + bucketName + path;
-
+  const url = BUCKET_URL + path;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl,
@@ -426,3 +759,27 @@ exports.serializeCard = function(card) {
     rei_init, rei_max, ma_init, ma_max,
   };
 };
+
+exports.serializePlay = function(play) {
+  const {midi, album} = play;
+  if ((midi && midi.coverPath) || (album && album.coverPath)) {
+    const coverPath = (midi && midi.coverPath) || (album && album.coverPath);
+    play.coverUrl = BUCKET_URL + coverPath;
+    const coverBlurPath = (midi && midi.coverBlurPath) || (album && album.coverBlurPath);
+    play.coverBlurUrl = BUCKET_URL + coverBlurPath;
+  }
+  return play;
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
+  userId: ObjectId,
+
+  col: String,
+  docId: ObjectId,
+
+  action: String,
+  value: Number,
+
+  date: Date,
+}, {collection: 'docActions'}));

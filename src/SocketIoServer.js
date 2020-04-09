@@ -1,10 +1,9 @@
-const debug = require('debug')('thmix:Server');
-
-const Session = require('./Session');
+const debug = require('debug')('thmix:SocketIoServer');
+const SocketIoSession = require('./SocketIoSession');
 
 const VERSION = 0;
 
-module.exports = class Server {
+module.exports = class SocketIoServer {
   constructor(io, storage, tempPath, translationService) {
     /** @type {import('socket.io').Server} */
     this.io = io;
@@ -18,27 +17,38 @@ module.exports = class Server {
     /** @type {import('./TranslationService')} */
     this.translationService = translationService;
 
-    /** @type {Object.<string, Session>} */
+    /** @type {Object.<string, SocketIoSession>} */
     this.sessions = {};
     this.version = VERSION;
 
     this.boardListeners = {};
 
+    this.peakOnlineCount = 0;
+
+    this.revision = require('child_process')
+        .execSync('git rev-parse HEAD')
+        .toString().trim();
+
     io.on('connection', (socket) => {
       debug('onConnection', socket.id);
-      this.sessions[socket.id] = new Session(this, socket);
+      this.sessions[socket.id] = new SocketIoSession(this, socket);
     });
   }
 
+  async shutdown() {
+    debug('shutdown');
+    await Promise.all(Object.values(this.sessions).map((x) => x.onDisconnect()));
+  }
+
   /**
-   * @param {Session} session
+   * @param {SocketIoSession} session
    */
   addBoardListener(session) {
     this.boardListeners[session.socketId] = session;
   }
 
   /**
-   * @param {Session} session
+   * @param {SocketIoSession} session
    */
   removeBoardListener(session) {
     delete this.boardListeners[session.socketId];
@@ -57,6 +67,11 @@ module.exports = class Server {
     if (typeof this.sessions[socketId] === 'object') {
       this.sessions[socketId].socket.disconnect();
     } else debug('ending mal-formed session', socketId);
+    this.disposeSession(socketId);
+  }
+
+  disposeSession(socketId) {
+    debug('disposeSession', socketId);
     delete this.sessions[socketId];
     delete this.boardListeners[socketId];
   }
