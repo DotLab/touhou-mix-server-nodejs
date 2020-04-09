@@ -592,6 +592,8 @@ module.exports = class SocketIoSession {
       {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
       {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}},
+      {$unwind: {path: '$author', preserveNullAndEmptyArrays: true}},
     ]);
     const midi = await query.exec();
     success(done, serializeMidi(midi[0], {user: this.user}));

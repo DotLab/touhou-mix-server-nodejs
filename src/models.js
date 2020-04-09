@@ -217,7 +217,7 @@ exports.serializeMidi = function(midi, context) {
   let {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl, authorId, songId, song, album,
+    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
     derivedFromId, supersedeId, supersededById,
     mp3Path,
     coverPath, coverBlurPath,
@@ -231,6 +231,9 @@ exports.serializeMidi = function(midi, context) {
     sCount, aCount, bCount, cCount, dCount, fCount,
     hash,
   } = midi;
+  if (author) {
+    author = exports.serializePerson(author);
+  }
   if (album && album.coverPath) {
     coverPath = album.coverPath;
     coverBlurPath = album.coverBlurPath;
@@ -252,7 +255,7 @@ exports.serializeMidi = function(midi, context) {
     _id,
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl, authorId, songId, song, album,
+    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
     canEdit: context && context.user && checkUserRole(context.user.roles, ROLE_MIDI_MOD),
     derivedFromId, supersedeId, supersededById,
     mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
