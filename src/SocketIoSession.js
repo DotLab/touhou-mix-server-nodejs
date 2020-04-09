@@ -266,6 +266,10 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_resource_upload', this.onClWebResourceUpload.bind(this));
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
 
+    this.socket.on('cl_web_card_upload', this.onClWebCardUpload.bind(this));
+    this.socket.on('cl_web_card_get', this.onClWebCardGet.bind(this));
+    this.socket.on('cl_web_card_update', this.onClWebCardUpdate.bind(this));
+
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
@@ -1230,6 +1234,66 @@ module.exports = class SocketIoSession {
 
     resource = await Resource.findByIdAndUpdate(id, {$set: update}, {new: true});
     success(done, serializeResource(resource));
+  }
+
+  async onClWebCardGet({id}, done) {
+    debug('  onClWebCardGet', id);
+
+    if (!verifyObjectId(id)) return error(done, 'not found');
+
+    const card = await Card.findById(id);
+    if (!card) return error(done, 'not found');
+
+    success(done, serializeCard(card));
+  }
+
+  // async onClWebCardList({type, status, sort, page}, done) {
+
+  // }
+
+  async onClWebCardUpload({name, size, buffer}, done) {
+    debug('  onClWebCardUpload', name, size, buffer.length);
+
+    if (!this.user) return error(done, 'forbidden');
+
+    const card = await Card.create({
+      ...createDefaultCard(),
+
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+
+      uploadedDate: new Date(),
+    });
+
+    success(done, {id: card.id});
+  }
+
+  async onClWebCardUpdate(update, done) {
+    debug('  onClWebCardUpdate', update.id);
+
+    const {
+      id,
+      name, desc, rarity, attribute,
+      sp_init, sp_max, haru_init, haru_max,
+      rei_init, rei_max, ma_init, ma_max,
+    } = update;
+
+    if (!this.user) return error(done, 'forbidden');
+    if (!verifyObjectId(id)) return error(done, 'forbidden');
+
+    let card = await Card.findById(id);
+    if (!card) return error(done, 'not found');
+    if (!card.uploaderId.equals(this.user.id)) return error(done, 'forbidden');
+
+    update = filterUndefinedKeys({
+      name, desc, rarity, attribute,
+      sp_init, sp_max, haru_init, haru_max,
+      rei_init, rei_max, ma_init, ma_max,
+    });
+
+    card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
+    success(done, serializeCard(card));
   }
 
   async onClWebMidiBestPerformance({id}, done) {
