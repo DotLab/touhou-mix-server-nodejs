@@ -229,9 +229,6 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
     this.socket.on('cl_web_midi_play_history', this.onClWebMidiPlayHistory.bind(this));
 
-    this.socket.on('ClWebMidiDerivedFrom', createRpcHandler(this.onClWebMidiDerivedFrom.bind(this)));
-    this.socket.on('ClWebMidiSupersede', createRpcHandler(this.onClWebMidiSupersede.bind(this)));
-
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
     this.socket.on('cl_web_soundfont_upload', this.onClWebSoundfontUpload.bind(this));
@@ -596,7 +593,7 @@ module.exports = class SocketIoSession {
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
       {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}},
-      {$unwind: {path: '$author'}},
+      {$unwind: {path: '$author', preserveNullAndEmptyArrays: true}},
     ]);
     const midi = await query.exec();
     success(done, serializeMidi(midi[0], {user: this.user}));
@@ -1348,23 +1345,5 @@ module.exports = class SocketIoSession {
     debug('  onClWebDocCommentList', docId);
 
     return await commentController.list({docId});
-  }
-
-  async onClWebMidiDerivedFrom({derivedFromId}) {
-    derivedFromId = new ObjectId(derivedFromId);
-    debug('  onClWebMidiDerivedFrom', derivedFromId);
-
-    const derived = await Midi.findById(derivedFromId);
-    if (!derived) throw codeError(0, 'not found');
-    return serializeMidi(derived);
-  }
-
-  async onClWebMidiSupersede({supersedeId}) {
-    supersedeId = new ObjectId(supersedeId);
-    debug('  onClWebMidiSupersede', supersedeId);
-
-    const midi = await Midi.findById(supersedeId);
-    if (!midi) throw codeError(0, 'not found');
-    return serializeMidi(midi);
   }
 };
