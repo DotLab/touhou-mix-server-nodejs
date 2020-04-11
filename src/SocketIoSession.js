@@ -29,6 +29,7 @@ const {
   Trial, serializeTrial, serializePlay,
   Translation,
   SessionToken, SessionRecord,
+  Card, serializeCard, createDefaultCard,
 } = require('./models');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
@@ -1254,9 +1255,23 @@ module.exports = class SocketIoSession {
   async onClWebCardUpload({name, size, buffer}, done) {
     debug('  onClWebCardUpload', name, size, buffer.length);
 
-    if (!this.user) return error(done, 'forbidden');
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 1000 * MB) return error(done, 'tampering with api');
 
-    const card = await Card.create({
+    const hash = calcFileHash(buffer);
+
+    let card = await Card.findOne({hash});
+    if (card) return success(done, {duplicated: true, id: card.id});
+
+    const remotePath = `/cards/img/${hash}.png`;
+    const localPath = `${this.server.tempPath}/${hash}.png`;
+
+    fs.writeFileSync(localPath, buffer);
+    await this.server.bucketUploadPublic(localPath, remotePath);
+    fs.unlink(localPath, emptyHandle);
+
+    card = await Card.create({
       ...createDefaultCard(),
 
       uploaderId: this.user.id,
@@ -1275,8 +1290,7 @@ module.exports = class SocketIoSession {
     const {
       id,
       name, desc, rarity, attribute,
-      sp_init, sp_max, haru_init, haru_max,
-      rei_init, rei_max, ma_init, ma_max,
+      spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
     } = update;
 
     if (!this.user) return error(done, 'forbidden');
@@ -1288,8 +1302,7 @@ module.exports = class SocketIoSession {
 
     update = filterUndefinedKeys({
       name, desc, rarity, attribute,
-      sp_init, sp_max, haru_init, haru_max,
-      rei_init, rei_max, ma_init, ma_max,
+      spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
     });
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});

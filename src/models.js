@@ -711,17 +711,17 @@ exports.Card = mongoose.model('Card', {
   attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
 
   // parameters -------------------------------------------------------------------------
-  sp_init: {type: Number, required: true},
-  sp_max: {type: Number, required: true},
+  spInit: {type: Number, required: true},
+  spMax: {type: Number, required: true},
 
-  haru_init: {type: Number, required: true},
-  haru_max: {type: Number, required: true},
+  haruInit: {type: Number, required: true},
+  haruMax: {type: Number, required: true},
 
-  rei_init: {type: Number, required: true},
-  rei_max: {type: Number, required: true},
+  reiInit: {type: Number, required: true},
+  reiMax: {type: Number, required: true},
 
-  ma_init: {type: Number, required: true},
-  ma_max: {type: Number, required: true},
+  maInit: {type: Number, required: true},
+  maMax: {type: Number, required: true},
 });
 
 exports.createDefaultCard = function() {
@@ -744,19 +744,16 @@ exports.createDefaultCard = function() {
 };
 
 exports.serializeCard = function(card) {
-  const bucketName = 'scarletea';
   const {
     id,
     name, desc, rarity, attribute,
-    sp_init, sp_max, haru_init, haru_max,
-    rei_init, rei_max, ma_init, ma_max,
+    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
   } = card;
 
   return {
     id,
     name, desc, rarity, attribute,
-    sp_init, sp_max, haru_init, haru_max,
-    rei_init, rei_max, ma_init, ma_max,
+    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
   };
 };
 
