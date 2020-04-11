@@ -307,6 +307,7 @@ module.exports = class SocketIoSession {
     if (user) return error(done, 'existing name or email');
 
     this.pendingCode = genPendingCode();
+    debug('    code', this.pendingCode);
     await sendCodeEmail(name, email, 'register', this.pendingCode);
 
     success(done);

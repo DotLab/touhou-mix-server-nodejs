@@ -157,6 +157,7 @@ module.exports = class WebSocketSession {
   }
 
   returnError(id, message) {
+    debug('    error', message);
     this.rpc('SvAppHandleRpcResponse', {id, error: message});
   }
 
