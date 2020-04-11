@@ -203,6 +203,10 @@ module.exports = class WebSocketSession {
       {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
       {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}},
+      {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}},
+      {$unwind: {path: '$author', preserveNullAndEmptyArrays: true}},
     ]);
 
     this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
@@ -363,6 +367,14 @@ module.exports = class WebSocketSession {
 
     const midis = await Midi.aggregate([
       {$match: {status: 'INCLUDED'}},
+      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
+      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
+      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}},
+      {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}},
+      {$unwind: {path: '$author', preserveNullAndEmptyArrays: true}},
     ]);
     const songs = await Midi.aggregate([
       {$match: {status: 'INCLUDED'}},

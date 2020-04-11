@@ -630,8 +630,10 @@ module.exports = class SocketIoSession {
     pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
     pipeline.push({$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}});
     pipeline.push({$unwind: {path: '$album', preserveNullAndEmptyArrays: true}});
-    pipeline.push({$lookup: {from: 'composers', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
+    pipeline.push({$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
     pipeline.push({$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}});
+    pipeline.push({$unwind: {path: '$author', preserveNullAndEmptyArrays: true}});
 
     const midis = await Midi.aggregate(pipeline);
     success(done, midis.map((midi) => serializeMidi(midi)));
