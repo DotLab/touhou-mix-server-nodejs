@@ -267,7 +267,7 @@ exports.serializeMidi = function(midi, context) {
     comments, records,
     trialCount, loveCount, voteCount, voteSum,
     upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
-    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
+    avgScore: !trialCount ? 0 : score / trialCount, avgCombo: !trialCount ? 0 : combo / trialCount, avgAccuracy: !trialCount ? 0 : accuracy / trialCount,
     passCount: trialCount - fCount, failCount: fCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     sCount, aCount, bCount, cCount, dCount, fCount,
@@ -543,12 +543,13 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
 
 exports.serializeSong = function(doc) {
   const {
-    id,
+    _id,
     albumId, composerId, name, desc, track, category,
   } = doc;
 
   return {
-    id,
+    _id,
+    id: _id,
     albumId, composerId, name, desc, track, category,
   };
 };
@@ -566,12 +567,12 @@ exports.Person = Person;
 
 exports.serializePerson = function(doc) {
   const {
-    id,
+    _id,
     name, url, desc, avatarPath,
   } = doc;
   const avatarUrl = avatarPath ? BUCKET_URL + avatarPath : null;
   return {
-    id,
+    _id, id: _id,
     name, url, desc, avatarPath, avatarUrl,
   };
 };

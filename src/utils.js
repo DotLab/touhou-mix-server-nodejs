@@ -141,3 +141,20 @@ function getTimeBetween(end, start) {
   return end.getTime() - start.getTime();
 }
 exports.getTimeBetween = getTimeBetween;
+
+function objToCsClass(obj, name) {
+  let str = `public sealed class ${name}Proto {\n`;
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      switch (typeof(value)) {
+        case 'string': str += `\tpublic string ${key};\n`; break;
+        case 'number': str += `\tpublic ${(/Count$/i).test(key) ? 'int' : 'float'} ${key};\n`; break;
+        case 'object': str += `\tpublic SomeProto ${key};\n`; break;
+      }
+    }
+  }
+  str += `}\n`;
+  return str;
+}
+exports.objToCsClass = objToCsClass;

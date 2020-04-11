@@ -9,6 +9,9 @@ const {
   Midi, serializeMidi,
   Trial, getGradeFromAccuracy, getGradeLevelFromAccuracy,
   Build, serializeBuild,
+  serializeSong,
+  serializeAlbum,
+  serializePerson,
   Soundfont,
   DocAction,
 } = require('./models');
@@ -365,16 +368,16 @@ module.exports = class WebSocketSession {
       {$match: {status: 'INCLUDED'}},
       {$group: {_id: '$songId'}},
       {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$unwind: {path: '$song'}},
       {$replaceRoot: {newRoot: '$song'}},
     ]);
     const albums = await Midi.aggregate([
       {$match: {status: 'INCLUDED'}},
       {$group: {_id: '$songId'}},
       {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+      {$unwind: {path: '$song'}},
       {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
+      {$unwind: {path: '$album'}},
       {$replaceRoot: {newRoot: '$album'}},
     ]);
     const persons = [
@@ -382,23 +385,26 @@ module.exports = class WebSocketSession {
         {$match: {status: 'INCLUDED'}},
         {$group: {_id: '$authorId'}},
         {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
-        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+        {$unwind: {path: '$composer'}},
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
       ...(await Midi.aggregate([
         {$match: {status: 'INCLUDED'}},
         {$group: {_id: '$songId'}},
         {$lookup: {from: 'songs', localField: '_id', foreignField: '_id', as: 'song'}},
-        {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
+        {$unwind: {path: '$song'}},
         {$group: {_id: '$song.composerId'}},
         {$lookup: {from: 'persons', localField: '_id', foreignField: '_id', as: 'composer'}},
-        {$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}},
+        {$unwind: {path: '$composer'}},
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
     ];
 
     return this.returnSuccess(id, {
-      midis, songs, albums, persons,
+      midis: midis.map(serializeMidi),
+      songs: songs.map(serializeSong),
+      albums: albums.map(serializeAlbum),
+      persons: persons.map(serializePerson),
     });
   }
 };
