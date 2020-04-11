@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketSession');
 const ObjectId = require('mongoose').Types.ObjectId;
 const {
-  NAMESPACE_UI_APP,
+  UI_APP,
 } = require('./TranslationService');
 const {
   User, serializeUser,
@@ -351,7 +351,7 @@ module.exports = class WebSocketSession {
   async clAppTranslate(id, {src, lang, namespace}) {
     debug('  clAppTranslate', src, lang);
     if (!namespace) {
-      namespace = NAMESPACE_UI_APP;
+      namespace = UI_APP;
     }
 
     try {

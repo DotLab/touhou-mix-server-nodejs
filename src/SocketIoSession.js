@@ -30,6 +30,7 @@ const {
   Translation,
   SessionToken, SessionRecord,
 } = require('./models');
+const {NAME_ARTIFACT} = require('./TranslationService');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
@@ -841,6 +842,7 @@ module.exports = class SocketIoSession {
 
     const {
       id, name, desc, category,
+      lang, nameI18n,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -854,6 +856,9 @@ module.exports = class SocketIoSession {
     });
 
     doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
+    if (lang) {
+      if (nameI18n) await this.server.translationService.update(this.user, name, lang, NAME_ARTIFACT, nameI18n);
+    }
     success(done, serializeAlbum(doc));
   }
 
@@ -889,6 +894,7 @@ module.exports = class SocketIoSession {
 
     const {
       id, albumId, composerId, name, desc, track,
+      lang, nameI18n,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -902,6 +908,9 @@ module.exports = class SocketIoSession {
     });
 
     doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
+    if (lang) {
+      if (nameI18n) await this.server.translationService.update(this.user, name, lang, NAME_ARTIFACT, nameI18n);
+    }
     success(done, serializeSong(doc));
   }
 

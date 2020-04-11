@@ -8,10 +8,10 @@ class TranslationService {
 
   async translate(src, lang, namespace) {
     if (!namespace) {
-      namespace = TranslationService.NAMESPACE_UNKNOWN;
+      namespace = TranslationService.UNKNOWN;
     } else {
       if (lang === 'en' && namespace.substr(0, 2) === 'ui') {
-        // ui is in english
+        // ui must be in english
         return src;
       }
     }
@@ -26,7 +26,7 @@ class TranslationService {
 
   async update(user, src, lang, namespace, text) {
     if (!namespace) {
-      namespace = TranslationService.NAMESPACE_UNKNOWN;
+      namespace = TranslationService.UNKNOWN;
     }
     await Translation.updateMany({src, lang, namespace}, {$set: {active: false}});
     await Translation.updateOne({
@@ -41,14 +41,14 @@ class TranslationService {
   }
 }
 
-TranslationService.NAMESPACE_UI = 'ui';
-TranslationService.NAMESPACE_UI_APP = 'ui.app';
-TranslationService.NAMESPACE_UI_WEB = 'ui.web';
-TranslationService.NAMESPACE_UI_VOLATILE = 'ui.volatile';
-TranslationService.NAMESPACE_NAME_SONG = 'name.song';
-TranslationService.NAMESPACE_NAME_ALBUM = 'name.album';
-TranslationService.NAMESPACE_NAME_ARTIFACT = 'name.artifact';
-TranslationService.NAMESPACE_TEXT_USER = 'text.user';
-TranslationService.NAMESPACE_UNKNOWN = 'unknown';
+TranslationService.UI = 'ui';
+TranslationService.UI_APP = 'ui.app';
+TranslationService.UI_WEB = 'ui.web';
+TranslationService.UI_VOLATILE = 'ui.volatile';
+TranslationService.NAME_SONG = 'name.song';
+TranslationService.NAME_ALBUM = 'name.album';
+TranslationService.NAME_ARTIFACT = 'name.artifact';
+TranslationService.TEXT_USER = 'text.user';
+TranslationService.UNKNOWN = 'unknown';
 
 module.exports = TranslationService;
