@@ -683,7 +683,7 @@ module.exports = [
 
   {albumIndex: 1305, track: 1, name: 'サニーミルクの紅霧異変'},
   {albumIndex: 1305, track: 2, name: '雪月桜花の国'},
-  {albumIndex: 1305, track: 3, name: 'スターヴォヤージュ208'},
+  {albumIndex: 1305, track: 3, name: 'スターヴォヤージュ2008'},
 
   {albumIndex: 1306, track: 1, name: '可愛い大戦争のリフレーン'},
   {albumIndex: 1306, track: 2, name: 'サニールチルフレクション'},
