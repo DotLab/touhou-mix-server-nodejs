@@ -14,6 +14,7 @@ const {
   serializePerson,
   Soundfont,
   DocAction,
+  Translation, serializeTranslation,
 } = require('./models');
 
 const PASSWORD_HASHER = 'sha512';
@@ -412,12 +413,14 @@ module.exports = class WebSocketSession {
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
     ];
+    const translations = await Translation.aggregate([]);
 
     return this.returnSuccess(id, {
       midis: midis.map(serializeMidi),
       songs: songs.map(serializeSong),
       albums: albums.map(serializeAlbum),
       persons: persons.map(serializePerson),
+      translations: translations.map(serializeTranslation),
     });
   }
 };

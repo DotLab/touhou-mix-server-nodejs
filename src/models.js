@@ -481,6 +481,11 @@ exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   active: Boolean,
 }));
 
+exports.serializeTranslation = function(doc) {
+  const {_id, src, lang, text, namespace, date, editorId, editorName} = doc;
+  return {_id, id: _id, src, lang, text, namespace, ns: namespace, date, editorId, editorName};
+};
+
 /** @type {import('mongoose').Model<Object>} */
 exports.Build = mongoose.model('Build', new mongoose.Schema({
   uploaderId: ObjectId,
