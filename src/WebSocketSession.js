@@ -350,7 +350,7 @@ module.exports = class WebSocketSession {
   }
 
   async clAppTranslate(id, {src, lang, namespace}) {
-    debug('  clAppTranslate', src, lang);
+    debug('  clAppTranslate', src, lang, namespace);
     if (!namespace) {
       namespace = UI_APP;
     }
