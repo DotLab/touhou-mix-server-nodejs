@@ -413,7 +413,9 @@ module.exports = class WebSocketSession {
         {$replaceRoot: {newRoot: '$composer'}},
       ])),
     ];
-    const translations = await Translation.find({}).lean();
+    const translations = await Translation.aggregate([
+      {$match: {active: true}},
+    ]);
 
     return this.returnSuccess(id, {
       midis: midis.map(serializeMidi),
