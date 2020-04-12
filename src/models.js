@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
@@ -107,6 +108,10 @@ exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
   // expiredDate: Date,
   invalidatedDate: Date,
 }, {collection: 'sessionTokens'}));
+
+exports.genSessionTokenHash = function() {
+  return crypto.randomBytes(64).toString('base64');
+};
 
 /** @type {import('mongoose').Model<Object>} */
 exports.SessionRecord = mongoose.model('SessionRecord', new mongoose.Schema({

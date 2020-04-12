@@ -15,7 +15,10 @@ const {
   Soundfont,
   DocAction,
   Translation, serializeTranslation,
+  SessionRecord,
+  SessionToken, genSessionTokenHash,
 } = require('./models');
+const {getTimeBetween} = require('./utils');
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 3 * 10;
@@ -134,13 +137,21 @@ module.exports = class WebSocketSession {
     }
   }
 
-  closeSession(code, reason) {
+  async closeSession(code, reason) {
     debug('  closeSession', code, reason);
+
+    if (this.sessionRecord) {
+      this.sessionRecord = await SessionRecord.findByIdAndUpdate(this.sessionRecord._id, {$set: {endDate: new Date()}}, {new: true});
+      await User.updateOne({_id: this.user._id}, {$inc: {onlineTime: getTimeBetween(this.sessionRecord.endDate, this.sessionRecord.startDate)}});
+      debug('    user', this.user.name, getTimeBetween(this.sessionRecord.endDate, this.sessionRecord.startDate) / 1000);
+    }
+
     this.server.closeSession(this);
   }
 
   handleError(error) {
     debug('  handleError', error);
+    this.closeSession(0, error);
     this.server.closeSession(this);
   }
 
@@ -169,13 +180,23 @@ module.exports = class WebSocketSession {
     if (!user) return this.returnError(id, 'wrong combination');
 
     const hash = calcPasswordHash(password, user.salt);
-    if (hash === user.hash) { // matched
-      this.user = user;
-      this.user = await this.updateUser({seenDate: new Date()});
-      return this.returnSuccess(id, serializeUser(this.user));
-    }
+    if (hash !== user.hash) return this.returnError(id, 'wrong combination');
 
-    return this.returnError(id, 'wrong combination');
+    this.user = user;
+    this.user = await this.updateUser({seenDate: new Date()});
+
+    await SessionToken.updateMany({userId: user._id, valid: true}, {
+      $set: {valid: false, invalidatedDate: new Date()},
+    });
+    this.sessionToken = await SessionToken.create({
+      userId: user._id, hash: genSessionTokenHash(), valid: true,
+      issuedDate: new Date(), seenDate: new Date(),
+    });
+    this.sessionRecord = await SessionRecord.create({
+      userId: user._id, tokenId: this.sessionToken._id,
+      startDate: new Date(), endDate: new Date(),
+    });
+    return this.returnSuccess(id, serializeUser(this.user));
   }
 
   async onClAppMidiListQuery(id, {status, query, sort, page}) {

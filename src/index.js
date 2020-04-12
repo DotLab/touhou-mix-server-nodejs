@@ -107,10 +107,6 @@ async function exitHandler(shouldExit, exitCode) {
   if (shouldExit) process.exit();
 }
 
-process.on('SIGINT', async () => {
-
-});
-
 // do something when app is closing
 process.on('exit', exitHandler.bind(null, false));
 

@@ -28,7 +28,8 @@ const {
   Resource, createDefaultResource, serializeResource,
   Trial, serializeTrial, serializePlay,
   Translation,
-  SessionToken, SessionRecord,
+  SessionToken, genSessionTokenHash,
+  SessionRecord,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -85,10 +86,6 @@ function calcFileHash(buffer) {
 
 function genPendingCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
-}
-
-function genSessionTokenHash() {
-  return crypto.randomBytes(64).toString('base64');
 }
 
 function createRpcHandler(resolver) {
