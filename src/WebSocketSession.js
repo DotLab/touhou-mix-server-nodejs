@@ -107,16 +107,16 @@ module.exports = class WebSocketSession {
 
       switch (command) {
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
-        case 'ClAppUserLogin': this.clAppUserLogin(id, args); break;
-        case 'ClAppMidiListQuery': this.clAppMidiListQuery(id, args); break;
-        case 'ClAppMidiDownload': this.clAppMidiDownload(id, args); break;
-        case 'ClAppPing': this.clAppPing(id, args); break;
-        case 'ClAppDocAction': this.clAppDocAction(id, args); break;
-        case 'ClAppTrialUpload': this.clAppTrialUpload(id, args); break;
-        case 'ClAppCheckVersion': this.clAppCheckVersion(id, args); break;
-        case 'ClAppMidiRecordList': this.clAppMidiRecordList(id, args); break;
-        case 'ClAppTranslate': this.clAppTranslate(id, args); break;
-        case 'ClAppMidiBundleBuild': this.clAppMidiBundleBuild(id); break;
+        case 'ClAppUserLogin': this.onClAppUserLogin(id, args); break;
+        case 'ClAppMidiListQuery': this.onClAppMidiListQuery(id, args); break;
+        case 'ClAppMidiDownload': this.onClAppMidiDownload(id, args); break;
+        case 'ClAppPing': this.onClAppPing(id, args); break;
+        case 'ClAppDocAction': this.onClAppDocAction(id, args); break;
+        case 'ClAppTrialUpload': this.onClAppTrialUpload(id, args); break;
+        case 'ClAppCheckVersion': this.onClAppCheckVersion(id, args); break;
+        case 'ClAppMidiRecordList': this.onClAppMidiRecordList(id, args); break;
+        case 'ClAppTranslate': this.onClAppTranslate(id, args); break;
+        case 'ClAppMidiBundleBuild': this.onClAppMidiBundleBuild(id); break;
         default: debug('unknown rpc', command, args, id); this.returnError(id, 'unknown rpc'); break;
       }
     } catch (e) {
@@ -162,7 +162,7 @@ module.exports = class WebSocketSession {
     this.rpc('SvAppHandleRpcResponse', {id, error: message});
   }
 
-  async clAppUserLogin(id, {name, password}) {
+  async onClAppUserLogin(id, {name, password}) {
     debug('  onClAppUserLogin', name, password);
 
     const user = await User.findOne({name});
@@ -178,7 +178,7 @@ module.exports = class WebSocketSession {
     return this.returnError(id, 'wrong combination');
   }
 
-  async clAppMidiListQuery(id, {status, query, sort, page}) {
+  async onClAppMidiListQuery(id, {status, query, sort, page}) {
     status = String(status);
     query = String(query || '');
     sort = String(sort || '-uploadedDate');
@@ -214,9 +214,9 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, midis.map((midi) => serializeMidi(midi)));
   }
 
-  async clAppMidiDownload(id, {hash}) {
+  async onClAppMidiDownload(id, {hash}) {
     hash = String(hash);
-    debug('  clAppMidiDownload', hash);
+    debug('  onClAppMidiDownload', hash);
 
     const midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
@@ -225,14 +225,14 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, url);
   }
 
-  async clAppPing(id, {time}) {
+  async onClAppPing(id, {time}) {
     time = parseInt(time);
-    debug('  clAppPing', time);
+    debug('  onClAppPing', time);
     this.returnSuccess(id, time);
   }
 
-  async clAppDocAction(id, {col, docId, action, value}) {
-    debug('  clAppDocAction', col, docId, action, value);
+  async onClAppDocAction(id, {col, docId, action, value}) {
+    debug('  onClAppDocAction', col, docId, action, value);
 
     if (!ObjectId.isValid(docId)) return this.returnError(id, 'invalid');
     docId = new ObjectId(docId);
@@ -253,7 +253,7 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id);
   }
 
-  async clAppTrialUpload(id, trial) {
+  async onClAppTrialUpload(id, trial) {
     const {
       hash,
       score, combo, accuracy,
@@ -261,7 +261,7 @@ module.exports = class WebSocketSession {
       version,
     } = trial;
     const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
-    debug('  clAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
+    debug('  onClAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
@@ -305,8 +305,8 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id);
   }
 
-  async clAppCheckVersion(id, {version}) {
-    debug('  clAppCheckVersion', version);
+  async onClAppCheckVersion(id, {version}) {
+    debug('  onClAppCheckVersion', version);
 
     let [build] = await Build.find({}).sort('-date').limit(1).lean().exec();
     build = serializeBuild(build);
@@ -329,8 +329,8 @@ module.exports = class WebSocketSession {
     });
   }
 
-  async clAppMidiRecordList(id, {hash}) {
-    debug('  clAppMidiRecordList', hash);
+  async onClAppMidiRecordList(id, {hash}) {
+    debug('  onClAppMidiRecordList', hash);
 
     const midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
@@ -349,8 +349,8 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, trials);
   }
 
-  async clAppTranslate(id, {src, lang, namespace}) {
-    debug('  clAppTranslate', src, lang, namespace);
+  async onClAppTranslate(id, {src, lang, namespace}) {
+    debug('  onClAppTranslate', src, lang, namespace);
     if (!namespace) {
       namespace = UI_APP;
     }
@@ -364,8 +364,8 @@ module.exports = class WebSocketSession {
     }
   }
 
-  async clAppMidiBundleBuild(id) {
-    debug('  clAppMidiBundleBuild');
+  async onClAppMidiBundleBuild(id) {
+    debug('  onClAppMidiBundleBuild');
 
     const midis = await Midi.aggregate([
       {$match: {status: 'INCLUDED'}},
