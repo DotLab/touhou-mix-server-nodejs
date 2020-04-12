@@ -18,7 +18,7 @@ const {
 } = require('./models');
 
 const PASSWORD_HASHER = 'sha512';
-const MIDI_LIST_PAGE_LIMIT = 18;
+const MIDI_LIST_PAGE_LIMIT = 3 * 10;
 const TRIAL_SCORING_VERSION = 3;
 
 const LOVE = 'love'; // 1 to set; 0 to cancel
@@ -414,7 +414,7 @@ module.exports = class WebSocketSession {
       ])),
     ];
     const translations = await Translation.aggregate([
-      {$match: {active: true}},
+      {$match: {active: true, lang: 'en', namespace: 'name.artifact'}},
     ]);
 
     return this.returnSuccess(id, {
