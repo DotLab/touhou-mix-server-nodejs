@@ -164,16 +164,6 @@ const MidiSchema = new mongoose.Schema({
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
-  // comments
-  comments: [{
-    userId: ObjectId,
-    userName: String,
-    userAvatarUrl: String,
-    grade: String,
-    date: Date,
-
-    text: String,
-  }],
 
   trialCount: Number,
   loveCount: Number,
@@ -249,7 +239,7 @@ exports.serializeMidi = function(midi, context) {
   if (song) {
     song = exports.serializeSong(song);
   }
-  if (album && album.coverPath) {
+  if (!coverPath && album && album.coverPath) {
     coverPath = album.coverPath;
     coverBlurPath = album.coverBlurPath;
   }
