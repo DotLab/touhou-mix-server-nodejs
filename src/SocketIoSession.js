@@ -268,6 +268,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_resource_update', this.onClWebResourceUpdate.bind(this));
 
     this.socket.on('cl_web_card_upload', this.onClWebCardUpload.bind(this));
+    this.socket.on('cl_web_card_upload_cover', this.onClWebCardUploadCover.bind(this));
     this.socket.on('cl_web_card_get', this.onClWebCardGet.bind(this));
     this.socket.on('cl_web_card_update', this.onClWebCardUpdate.bind(this));
 
@@ -1263,10 +1264,15 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) return error(done, 'not found');
 
-    const card = await Card.findById(id);
+    const card = await Card.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}}, // related user
+      {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+    ]);
+
     if (!card) return error(done, 'not found');
 
-    success(done, serializeCard(card));
+    success(done, serializeCard(card[0]));
   }
 
   // async onClWebCardList({type, status, sort, page}, done) {
@@ -1298,11 +1304,32 @@ module.exports = class SocketIoSession {
       uploaderId: this.user.id,
       uploaderName: this.user.name,
       uploaderAvatarUrl: this.user.avatarUrl,
+      hash, path: remotePath,
 
       uploadedDate: new Date(),
     });
 
     success(done, {id: card.id});
+  }
+
+  async onClWebCardUploadCover({id, size, buffer}, done) {
+    debug('  onClWebCardUploadCover', id, size, buffer.length);
+
+    if (!this.user) return error(done, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) return error(done, ERROR_FORBIDDEN);
+    if (size !== buffer.length) return error(done, 'tampering with api');
+    if (size > 2*MB) return error(done, 'too large');
+
+    let card = await Card.findById(id);
+    if (!card) return error(done, 'not found');
+    if (!card.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_SITE_OWNER)) return error(done, ERROR_FORBIDDEN);
+
+    const paths = await this.uploadCover(buffer);
+    card = await Card.findByIdAndUpdate(id, {$set: {
+      path: paths.path,
+    }}, {new: true});
+
+    success(done, serializeCard(card));
   }
 
   async onClWebCardUpdate(update, done) {
