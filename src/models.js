@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
@@ -108,6 +109,10 @@ exports.SessionToken = mongoose.model('SessionToken', new mongoose.Schema({
   invalidatedDate: Date,
 }, {collection: 'sessionTokens'}));
 
+exports.genSessionTokenHash = function() {
+  return crypto.randomBytes(64).toString('base64');
+};
+
 /** @type {import('mongoose').Model<Object>} */
 exports.SessionRecord = mongoose.model('SessionRecord', new mongoose.Schema({
   userId: ObjectId,
@@ -217,7 +222,8 @@ exports.serializeMidi = function(midi, context) {
   let {
     _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
+    name, desc, artistName, artistUrl, authorId, songId,
+    song, album, author, composer,
     derivedFromId, supersedeId, supersededById,
     mp3Path,
     coverPath, coverBlurPath,
@@ -233,6 +239,15 @@ exports.serializeMidi = function(midi, context) {
   } = midi;
   if (author) {
     author = exports.serializePerson(author);
+  }
+  if (composer) {
+    composer = exports.serializePerson(composer);
+  }
+  if (album) {
+    album = exports.serializeAlbum(album);
+  }
+  if (song) {
+    song = exports.serializeSong(song);
   }
   if (album && album.coverPath) {
     coverPath = album.coverPath;
@@ -255,7 +270,8 @@ exports.serializeMidi = function(midi, context) {
     _id,
     id: _id,
     uploaderId, uploaderName, uploaderAvatarUrl,
-    name, desc, artistName, artistUrl, authorId, songId, song, album, author,
+    name, desc, artistName, artistUrl, authorId, songId,
+    song, album, author, composer,
     canEdit: context && context.user && checkUserRole(context.user.roles, ROLE_MIDI_MOD),
     derivedFromId, supersedeId, supersededById,
     mp3Path, mp3Url: mp3Path && BUCKET_URL + mp3Path,
@@ -267,7 +283,7 @@ exports.serializeMidi = function(midi, context) {
     comments, records,
     trialCount, loveCount, voteCount, voteSum,
     upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
-    avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
+    avgScore: !trialCount ? 0 : score / trialCount, avgCombo: !trialCount ? 0 : combo / trialCount, avgAccuracy: !trialCount ? 0 : accuracy / trialCount,
     passCount: trialCount - fCount, failCount: fCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     sCount, aCount, bCount, cCount, dCount, fCount,
@@ -470,6 +486,11 @@ exports.Translation = mongoose.model('Translation', new mongoose.Schema({
   active: Boolean,
 }));
 
+exports.serializeTranslation = function(doc) {
+  const {_id, src, lang, text, namespace, date, editorId, editorName} = doc;
+  return {_id, id: _id, src, lang, text, namespace, ns: namespace, date, editorId, editorName};
+};
+
 /** @type {import('mongoose').Model<Object>} */
 exports.Build = mongoose.model('Build', new mongoose.Schema({
   uploaderId: ObjectId,
@@ -543,12 +564,13 @@ exports.Song = mongoose.model('Song', new mongoose.Schema({
 
 exports.serializeSong = function(doc) {
   const {
-    id,
+    _id,
     albumId, composerId, name, desc, track, category,
   } = doc;
 
   return {
-    id,
+    _id,
+    id: _id,
     albumId, composerId, name, desc, track, category,
   };
 };
@@ -566,12 +588,12 @@ exports.Person = Person;
 
 exports.serializePerson = function(doc) {
   const {
-    id,
+    _id,
     name, url, desc, avatarPath,
   } = doc;
   const avatarUrl = avatarPath ? BUCKET_URL + avatarPath : null;
   return {
-    id,
+    _id, id: _id,
     name, url, desc, avatarPath, avatarUrl,
   };
 };

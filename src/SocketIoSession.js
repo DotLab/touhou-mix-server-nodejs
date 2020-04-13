@@ -28,9 +28,11 @@ const {
   Resource, createDefaultResource, serializeResource,
   Trial, serializeTrial, serializePlay,
   Translation,
-  SessionToken, SessionRecord,
+  SessionToken, genSessionTokenHash,
+  SessionRecord,
   Card, serializeCard, createDefaultCard,
 } = require('./models');
+const {NAME_ARTIFACT} = require('./TranslationService');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
@@ -42,6 +44,7 @@ const PASSWORD_HASHER = 'sha512';
 const MB = 1048576;
 const USER_LIST_PAGE_LIMIT = 50;
 const MIDI_LIST_PAGE_LIMIT = 50;
+const ALBUM_LIST_PAGE_LIMIT = 10;
 
 const IMAGE = 'image';
 const SOUND = 'sound';
@@ -84,10 +87,6 @@ function calcFileHash(buffer) {
 
 function genPendingCode() {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
-}
-
-function genSessionTokenHash() {
-  return crypto.randomBytes(64).toString('base64');
 }
 
 function createRpcHandler(resolver) {
@@ -250,6 +249,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_album_update', this.onClWebAlbumUpdate.bind(this));
     this.socket.on('cl_web_album_upload_cover', this.onClWebAlbumUploadCover.bind(this));
     this.socket.on('cl_web_album_list', this.onClWebAlbumList.bind(this));
+    this.socket.on('cl_web_album_info_list', this.onClWebAlbumInfoList.bind(this));
 
     this.socket.on('cl_web_song_create', this.onClWebSongCreate.bind(this));
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
@@ -310,6 +310,7 @@ module.exports = class SocketIoSession {
     if (user) return error(done, 'existing name or email');
 
     this.pendingCode = genPendingCode();
+    debug('    code', this.pendingCode);
     await sendCodeEmail(name, email, 'register', this.pendingCode);
 
     success(done);
@@ -633,8 +634,10 @@ module.exports = class SocketIoSession {
     pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
     pipeline.push({$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}});
     pipeline.push({$unwind: {path: '$album', preserveNullAndEmptyArrays: true}});
-    pipeline.push({$lookup: {from: 'composers', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
+    pipeline.push({$lookup: {from: 'persons', localField: 'song.composerId', foreignField: '_id', as: 'composer'}});
     pipeline.push({$unwind: {path: '$composer', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}});
+    pipeline.push({$unwind: {path: '$author', preserveNullAndEmptyArrays: true}});
 
     const midis = await Midi.aggregate(pipeline);
     success(done, midis.map((midi) => serializeMidi(midi)));
@@ -841,6 +844,7 @@ module.exports = class SocketIoSession {
 
     const {
       id, name, desc, category,
+      lang, nameI18n,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -854,6 +858,9 @@ module.exports = class SocketIoSession {
     });
 
     doc = await Album.findByIdAndUpdate(id, {$set: update}, {new: true});
+    if (lang) {
+      if (nameI18n) await this.server.translationService.update(this.user, name, lang, NAME_ARTIFACT, nameI18n);
+    }
     success(done, serializeAlbum(doc));
   }
 
@@ -889,6 +896,7 @@ module.exports = class SocketIoSession {
 
     const {
       id, albumId, composerId, name, desc, track,
+      lang, nameI18n,
     } = update;
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
@@ -902,6 +910,9 @@ module.exports = class SocketIoSession {
     });
 
     doc = await Song.findByIdAndUpdate(id, {$set: update}, {new: true});
+    if (lang) {
+      if (nameI18n) await this.server.translationService.update(this.user, name, lang, NAME_ARTIFACT, nameI18n);
+    }
     success(done, serializeSong(doc));
   }
 
@@ -977,8 +988,9 @@ module.exports = class SocketIoSession {
     success(done, serializePerson(doc));
   }
 
-  async onClWebAlbumList(done) {
-    debug('  onClWebAlbumList');
+  async onClWebAlbumList({page}, done) {
+    page = parseInt(page || 0);
+    debug('  onClWebAlbumList', page);
 
     const albums = await Song.aggregate([
       {$lookup: {from: 'persons', localField: 'composerId', foreignField: '_id', as: 'composer'}},
@@ -989,8 +1001,17 @@ module.exports = class SocketIoSession {
       {$addFields: {'album.songs': '$songs'}},
       {$replaceRoot: {newRoot: '$album'}},
       {$sort: {date: -1}},
+      {$skip: page * ALBUM_LIST_PAGE_LIMIT},
+      {$limit: ALBUM_LIST_PAGE_LIMIT},
     ]);
 
+    success(done, albums.map((x) => serializeAlbum(x)));
+  }
+
+  async onClWebAlbumInfoList(done) {
+    debug('  onClWebAlbumInfoList');
+
+    const albums = await Album.find({}).sort('-date');
     success(done, albums.map((x) => serializeAlbum(x)));
   }
 
