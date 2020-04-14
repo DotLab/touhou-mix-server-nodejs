@@ -271,6 +271,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_card_upload_cover', this.onClWebCardUploadCover.bind(this));
     this.socket.on('cl_web_card_get', this.onClWebCardGet.bind(this));
     this.socket.on('cl_web_card_update', this.onClWebCardUpdate.bind(this));
+    this.socket.on('cl_web_card_list', this.onClWebCardList.bind(this));
 
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
@@ -1275,9 +1276,32 @@ module.exports = class SocketIoSession {
     success(done, serializeCard(card[0]));
   }
 
-  // async onClWebCardList({type, status, sort, page}, done) {
+  async onClWebCardList({rarity, attribute, sort, page, search}, done) {
+    sort = String(sort || '-uploadedDate');
+    page = parseInt(page || 0);
+    debug('  onClWebCardList', rarity, attribute, sort, page);
 
-  // }
+    const pipeline = [];
+    if (search) {
+      pipeline.push({$match: {$text: {$search: search}}});
+    }
+
+    if (rarity) {
+      pipeline.push({$match: {rarity}});
+    }
+    if (attribute) {
+      pipeline.push({$match: {attribute}});
+    }
+    pipeline.push({$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}});
+    pipeline.push({$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}});
+
+    pipeline.push({$sort: sortQueryToSpec(sort)});
+    pipeline.push({$skip: page * MIDI_LIST_PAGE_LIMIT});
+    pipeline.push({$limit: MIDI_LIST_PAGE_LIMIT});
+
+    const cards = await Card.aggregate(pipeline);
+    success(done, cards.map((card) => serializeCard(card)));
+  }
 
   async onClWebCardUpload({name, size, buffer}, done) {
     debug('  onClWebCardUpload', name, size, buffer.length);

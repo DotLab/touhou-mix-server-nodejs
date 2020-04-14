@@ -50,14 +50,14 @@ exports.User = mongoose.model('User', new mongoose.Schema({
 
 exports.serializeUser = function(user) {
   const {
-    id,
+    _id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
     performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
-    id,
+    id: _id,
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
@@ -723,7 +723,7 @@ exports.serializeResource = function(resource) {
   };
 };
 
-exports.Card = mongoose.model('Card', new mongoose.Schema({
+const CardSchema = new mongoose.Schema({
   uploaderId: ObjectId,
   date: Date,
   name: String,
@@ -747,7 +747,19 @@ exports.Card = mongoose.model('Card', new mongoose.Schema({
 
   maInit: {type: Number, required: true, min: 200, max: 750},
   maMax: {type: Number, required: true, min: 400, max: 1200},
-}));
+});
+
+CardSchema.index({
+  name: 'text',
+  desc: 'text',
+  rarity: 'text',
+  attribute: 'text',
+}, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
+const Card = mongoose.model('Card', CardSchema);
+Card.syncIndexes().catch((e) => debug(e));
+exports.Card = Card;
 
 exports.createDefaultCard = function() {
   return {
