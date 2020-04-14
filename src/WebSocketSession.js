@@ -241,6 +241,7 @@ module.exports = class WebSocketSession {
 
     const midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
+    await Midi.updateOne({_id: midi._id}, {$inc: {downloadCount: 1}});
 
     const url = 'https://storage.thmix.org' + midi.path;
     this.returnSuccess(id, url);

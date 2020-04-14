@@ -165,18 +165,9 @@ const MidiSchema = new mongoose.Schema({
 
   touhouAlbumIndex: Number,
   touhouSongIndex: Number,
-  // comments
-  comments: [{
-    userId: ObjectId,
-    userName: String,
-    userAvatarUrl: String,
-    grade: String,
-    date: Date,
-
-    text: String,
-  }],
 
   trialCount: Number,
+  downloadCount: Number,
   loveCount: Number,
   voteCount: Number,
   voteSum: Number,
@@ -232,7 +223,7 @@ exports.serializeMidi = function(midi, context) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, loveCount, voteCount, voteSum,
+    trialCount, downloadCount, loveCount, voteCount, voteSum,
     score, combo, accuracy,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
     sCount, aCount, bCount, cCount, dCount, fCount,
@@ -250,7 +241,7 @@ exports.serializeMidi = function(midi, context) {
   if (song) {
     song = exports.serializeSong(song);
   }
-  if (album && album.coverPath) {
+  if (!coverPath && album && album.coverPath) {
     coverPath = album.coverPath;
     coverBlurPath = album.coverBlurPath;
   }
@@ -282,7 +273,7 @@ exports.serializeMidi = function(midi, context) {
     sourceArtistName, sourceAlbumName, sourceSongName,
     touhouAlbumIndex, touhouSongIndex,
     comments, records,
-    trialCount, loveCount, voteCount, voteSum,
+    trialCount, downloadCount, loveCount, voteCount, voteSum,
     upCount: (voteCount + voteSum) / 2, downCount: voteCount - (voteCount + voteSum) / 2,
     avgScore: !trialCount ? 0 : score / trialCount, avgCombo: !trialCount ? 0 : combo / trialCount, avgAccuracy: !trialCount ? 0 : accuracy / trialCount,
     passCount: trialCount - fCount, failCount: fCount,
