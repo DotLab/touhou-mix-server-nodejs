@@ -5,6 +5,7 @@ const ObjectId = mongoose.Schema.Types.ObjectId;
 const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
+// const BUCKET_URL = 'https://storage.cloud.google.com/scarletea';
 
 exports.connectDatabase = async function(database) {
   const mongoose = require('mongoose');
@@ -722,29 +723,31 @@ exports.serializeResource = function(resource) {
   };
 };
 
-exports.Card = mongoose.model('Card', {
+exports.Card = mongoose.model('Card', new mongoose.Schema({
   uploaderId: ObjectId,
   date: Date,
   name: String,
   desc: String,
 
+  hash: String,
+  path: String,
   // main -------------------------------------------------------------------------
   rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
   attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
 
   // parameters -------------------------------------------------------------------------
-  spInit: {type: Number, required: true},
-  spMax: {type: Number, required: true},
+  spInit: {type: Number, required: true, min: 1, max: 4},
+  spMax: {type: Number, required: true, min: 1, max: 4},
 
-  haruInit: {type: Number, required: true},
-  haruMax: {type: Number, required: true},
+  haruInit: {type: Number, required: true, min: 1000, max: 2000},
+  haruMax: {type: Number, required: true, min: 1500, max: 3000},
 
-  reiInit: {type: Number, required: true},
-  reiMax: {type: Number, required: true},
+  reiInit: {type: Number, required: true, min: 200, max: 750},
+  reiMax: {type: Number, required: true, min: 400, max: 1200},
 
-  maInit: {type: Number, required: true},
-  maMax: {type: Number, required: true},
-});
+  maInit: {type: Number, required: true, min: 200, max: 750},
+  maMax: {type: Number, required: true, min: 400, max: 1200},
+}));
 
 exports.createDefaultCard = function() {
   return {
@@ -754,28 +757,31 @@ exports.createDefaultCard = function() {
     name: '',
     desc: '',
 
-    sp_init: 0,
-    sp_max: 0,
-    haru_init: 0,
-    haru_max: 0,
-    rei_init: 0,
-    rei_max: 0,
-    ma_init: 0,
-    ma_max: 0,
+    spInit: 1,
+    spMax: 4,
+    haruInit: 1000,
+    haruMax: 3000,
+    reiInit: 200,
+    reiMax: 1200,
+    maInit: 200,
+    maMax: 1200,
   };
 };
 
 exports.serializeCard = function(card) {
-  const {
-    id,
-    name, desc, rarity, attribute,
-    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+  let {
+    _id,
+    name, desc, rarity, attribute, path, date,
+    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax, uploader,
   } = card;
-
+  const url = path ? BUCKET_URL + path : null;
+  if (uploader) {
+    uploader = exports.serializeUser(uploader);
+  }
   return {
-    id,
-    name, desc, rarity, attribute,
-    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+    id: _id,
+    name, desc, rarity, attribute, path, url, date,
+    spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax, uploader,
   };
 };
 

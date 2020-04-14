@@ -1306,7 +1306,7 @@ module.exports = class SocketIoSession {
       uploaderAvatarUrl: this.user.avatarUrl,
       hash, path: remotePath,
 
-      uploadedDate: new Date(),
+      date: new Date(),
     });
 
     success(done, {id: card.id});
