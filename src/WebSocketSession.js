@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketSession');
-const ObjectId = require('mongoose').Types.ObjectId;
 const {
   UI_APP,
 } = require('./TranslationService');
@@ -12,13 +11,17 @@ const {
   serializeSong,
   serializeAlbum,
   serializePerson,
-  Soundfont,
   DocAction,
   Translation, serializeTranslation,
   SessionRecord,
   SessionToken, genSessionTokenHash,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
+const {midiController} = require('./controllers');
+
+function codeError(code, error) {
+  return `${error} (${code})`;
+}
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 3 * 10;
@@ -28,7 +31,6 @@ const LOVE = 'love'; // 1 to set; 0 to cancel
 const VOTE = 'vote'; // 1 to up; -1 to down;
 
 const MIDIS = 'midis';
-const SOUNDFONTS = 'soundfonts';
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -111,10 +113,11 @@ module.exports = class WebSocketSession {
       switch (command) {
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
         case 'ClAppUserLogin': this.onClAppUserLogin(id, args); break;
+        case 'ClAppMidiGet': this.wrapRpcHandler(id, args, this.onClAppMidiGet.bind(this)); break;
         case 'ClAppMidiListQuery': this.onClAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.onClAppMidiDownload(id, args); break;
         case 'ClAppPing': this.onClAppPing(id, args); break;
-        case 'ClAppDocAction': this.onClAppDocAction(id, args); break;
+        case 'ClAppMidiAction': this.onClAppMidiAction(id, args); break;
         case 'ClAppTrialUpload': this.onClAppTrialUpload(id, args); break;
         case 'ClAppCheckVersion': this.onClAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.onClAppMidiRecordList(id, args); break;
@@ -124,6 +127,15 @@ module.exports = class WebSocketSession {
       }
     } catch (e) {
       this.handleError(e);
+    }
+  }
+
+  async wrapRpcHandler(id, args, resolver) {
+    try {
+      const res = await resolver(args);
+      return this.returnSuccess(id, res);
+    } catch (e) {
+      return this.returnError(id, e);
     }
   }
 
@@ -165,11 +177,12 @@ module.exports = class WebSocketSession {
   }
 
   returnSuccess(id, data) {
+    debug('    success', id);
     this.rpc('SvAppHandleRpcResponse', {id, data});
   }
 
   returnError(id, message) {
-    debug('    error', message);
+    debug('    error', id, message);
     this.rpc('SvAppHandleRpcResponse', {id, error: message});
   }
 
@@ -197,6 +210,14 @@ module.exports = class WebSocketSession {
       startDate: new Date(), endDate: new Date(),
     });
     return this.returnSuccess(id, serializeUser(this.user));
+  }
+
+  async onClAppMidiGet({hash}) {
+    debug('  onClAppMidiGet', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) throw codeError(0, 'not found');
+    return await midiController.get(midi._id);
   }
 
   async onClAppMidiListQuery(id, {status, query, sort, page}) {
@@ -253,24 +274,14 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, time);
   }
 
-  async onClAppDocAction(id, {col, docId, action, value}) {
-    debug('  onClAppDocAction', col, docId, action, value);
+  async onClAppMidiAction(id, {hash, action, value}) {
+    debug('  onClAppMidiAction', hash, action, value);
 
-    if (!ObjectId.isValid(docId)) return this.returnError(id, 'invalid');
-    docId = new ObjectId(docId);
     if (!this.user) return this.returnError(id, 'forbidden');
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
 
-    let model = null;
-    switch (col) {
-      case MIDIS: model = Midi; break;
-      case SOUNDFONTS: model = Soundfont; break;
-      default: return this.returnError(id, 'not found');
-    }
-
-    const doc = await model.findOne(docId);
-    if (!doc) return this.returnError(id, 'not found');
-
-    await processDocAction(model, col, this.user.id, docId, action, value);
+    await processDocAction(Midi, MIDIS, this.user.id, midi._id, action, value);
 
     this.returnSuccess(id);
   }
