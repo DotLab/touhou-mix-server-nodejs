@@ -736,3 +736,23 @@ exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
 
   date: Date,
 }, {collection: 'docActions'}));
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Plot = mongoose.model('Plot', new mongoose.Schema({
+  editorId: ObjectId,
+
+  title: String,
+  script: String,
+  date: Date,
+  lastEdit: Date,
+}, {collection: 'plots'}));
+
+exports.serializePlot = function(plot) {
+  const {
+    _id,
+    editorId, title, script, date, lastEdit} = plot;
+
+  return {
+    id: _id, editorId, title, script, date, lastEdit,
+  };
+};

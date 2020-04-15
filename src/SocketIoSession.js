@@ -30,6 +30,7 @@ const {
   Translation,
   SessionToken, genSessionTokenHash,
   SessionRecord,
+  Plot, serializePlot,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -269,6 +270,10 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
+
+    this.socket.on('ClWebPlotCreate', createRpcHandler(this.onClWebPlotCreate.bind(this)));
+    this.socket.on('ClWebPlotUpdate', createRpcHandler(this.onClWebPlotUpdate.bind(this)));
+    this.socket.on('onClWebPlotGet', createRpcHandler(this.onClWebPlotGet.bind(this)));
 
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
@@ -1366,5 +1371,49 @@ module.exports = class SocketIoSession {
     debug('  onClWebDocCommentList', docId);
 
     return await commentController.list({docId});
+  }
+
+  async onClWebPlotCreate() {
+    debug('  onWebPlotCreate');
+
+    if (!this.user) throw codeError(0, 'forbidden');
+    const plot = await Plot.create({
+      script: '',
+      editorId: this.user.id,
+      date: new Date(),
+      lastEdit: new Date(),
+    });
+
+    return {id: plot.id};
+  }
+
+  async onClWebPlotUpdate(update) {
+    debug('   onClWebPlotUpdate');
+
+    const {
+      id, title, script,
+    } = update;
+
+    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let plot = await Plot.findById(id);
+    if (!plot) throw codeError(2, 'not found');
+    if (plot.editorId != (this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    update = filterUndefinedKeys({
+      title, script,
+    });
+
+    plot = await Plot.findByIdAndUpdate(id, {$set: {...update, lastEdit: new Date()}}, {new: true});
+    return serializePlot(plot);
+  }
+
+  async onClWebPlotGet({id}) {
+    debug('  onClWebPlotGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+    const plot = await Plot.findById(id);
+    return serializePlot(plot);
   }
 };
