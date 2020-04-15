@@ -397,7 +397,7 @@ module.exports = class WebSocketSession {
   async onClAppErrorReport(args) {
     const {
       version,
-      message, stack, source,
+      message, stack, source, exception,
       platform, runtime,
       sampleRate, bufferSize,
       model, name, os, cpu, gpu,
@@ -407,7 +407,7 @@ module.exports = class WebSocketSession {
     await ErrorReport.create({
       sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
       version,
-      message, stack, source,
+      message, stack, source, exception,
       platform, runtime,
       sampleRate, bufferSize,
       model, name, os, cpu, gpu,

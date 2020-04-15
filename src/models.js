@@ -768,7 +768,7 @@ exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
 exports.serializeErrorReport = function(errorReport, context) {
   const {
     _id,
-    sessionId, userId, date, version, message, stack,
+    sessionId, userId, date, version, message, stack, exception,
     source, platform, runtime, sampleRate, bufferSize,
     model, name, os, cpu, gpu,
   } = errorReport;
@@ -776,14 +776,14 @@ exports.serializeErrorReport = function(errorReport, context) {
   if (context && context.user && checkUserRole(context.user.roles, ROLE_SITE_OWNER)) {
     return {
       id: _id,
-      sessionId, userId, date, version, message, stack,
+      sessionId, userId, date, version, message, stack, exception,
       source, platform, runtime, sampleRate, bufferSize,
       model, name, os, cpu, gpu,
     };
   }
   return {
     id: _id,
-    date, version, message, stack, platform, runtime,
+    date, version, message, stack, exception, platform, runtime,
   };
 };
 
