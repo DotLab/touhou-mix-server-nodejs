@@ -766,7 +766,6 @@ exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
 }, {collection: 'errorReports'}));
 
 exports.serializeErrorReport = function(errorReport, context) {
-  debug(context);
   const {
     _id,
     sessionId, userId, date, version, message, stack,
@@ -774,7 +773,7 @@ exports.serializeErrorReport = function(errorReport, context) {
     model, name, os, cpu, gpu,
   } = errorReport;
 
-  if (context && checkUserRole(context.roles, ROLE_SITE_OWNER)) {
+  if (context && context.user && checkUserRole(context.user.roles, ROLE_SITE_OWNER)) {
     return {
       id: _id,
       sessionId, userId, date, version, message, stack,

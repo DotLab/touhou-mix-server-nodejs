@@ -1375,6 +1375,6 @@ module.exports = class SocketIoSession {
     debug('  onClErrorList');
 
     const errors = await ErrorReport.find({}).sort('-date');
-    return errors.map((x) => serializeErrorReport(x, this.user));
+    return errors.map((x) => serializeErrorReport(x, {user: this.user}));
   }
 };
