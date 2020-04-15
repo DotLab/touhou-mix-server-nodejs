@@ -356,6 +356,7 @@ exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   // history: [{note: Number, time: Number, delta: Number}],
 
   // cached
+  withdrew: Boolean,
   score: Number,
   combo: Number,
   accuracy: Number,
@@ -409,6 +410,7 @@ exports.getPassFailFromAccuracy = getPassFailFromAccuracy;
 exports.serializeTrial = function(trial) {
   let {
     id,
+    withdrew,
     userId, midiId, date, version, score, combo, accuracy,
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
     userName, userAvatarUrl,
@@ -419,7 +421,7 @@ exports.serializeTrial = function(trial) {
   return {
     id,
     userId, midiId, date, version, score, combo, accuracy,
-    grade: getGradeFromAccuracy(accuracy), gradeLevel: getGradeLevelFromAccuracy(accuracy),
+    grade: withdrew ? 'W' : getGradeFromAccuracy(accuracy), gradeLevel: withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy),
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
     userName, userAvatarUrl,
   };

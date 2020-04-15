@@ -290,48 +290,43 @@ module.exports = class WebSocketSession {
 
   async onClAppTrialUpload(id, trial) {
     const {
-      hash,
+      hash, withdrew,
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
       version,
     } = trial;
     const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
-    debug('  onClAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
+    const grade = withdrew ? 'W' : getGradeFromAccuracy(accuracy);
+    const gradeLevel = withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy);
+    debug('  onClAppTrialUpload', version, hash, grade, gradeLevel, performance, score);
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
-
-    const gradeLevel = getGradeLevelFromAccuracy(accuracy);
-    const countFieldName = gradeLevel.toLowerCase() + 'Count';
-
-    this.user = await this.updateUser({
-      $inc: {
-        trialCount: 1,
-        [countFieldName]: 1,
-        score,
-        combo,
-        performance,
-        accuracy,
-      },
-    });
-    const midi = await Midi.findOneAndUpdate({hash}, {
-      $inc: {
-        trialCount: 1,
-        [countFieldName]: 1,
-        score,
-        combo,
-        performance,
-        accuracy,
-      },
-    });
+    let midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
+
+    const countFieldName = gradeLevel.toLowerCase() + 'Count';
+    const $inc = {
+      trialCount: 1,
+      [countFieldName]: 1,
+      score,
+      combo,
+      performance,
+      accuracy,
+    };
+
+    if (!withdrew) {
+      this.user = await this.updateUser({$inc});
+      midi = await Midi.findOneAndUpdate({hash}, {$inc});
+    }
 
     await Trial.create({
       userId: this.user._id,
       midiId: midi._id,
       date: new Date(),
 
-      score, combo, accuracy, performance, grade: getGradeFromAccuracy(accuracy),
+      withdrew,
+      score, combo, accuracy, performance, grade,
       perfectCount, greatCount, goodCount, badCount, missCount,
 
       version,
