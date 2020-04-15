@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
-const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
+const {ROLE_MIDI_MOD, ROLE_SITE_OWNER, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
 
@@ -764,4 +764,27 @@ exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
   cpu: String,
   gpu: String,
 }, {collection: 'errorReports'}));
+
+exports.serializeErrorReport = function(errorReport, context) {
+  debug(context);
+  const {
+    _id,
+    sessionId, userId, date, version, message, stack,
+    source, platform, runtime, sampleRate, bufferSize,
+    model, name, os, cpu, gpu,
+  } = errorReport;
+
+  if (context && checkUserRole(context.roles, ROLE_SITE_OWNER)) {
+    return {
+      id: _id,
+      sessionId, userId, date, version, message, stack,
+      source, platform, runtime, sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    };
+  }
+  return {
+    id: _id,
+    date, version, message, stack, platform, runtime,
+  };
+};
 
