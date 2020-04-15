@@ -420,6 +420,7 @@ exports.serializeTrial = function(trial) {
   }
   return {
     id,
+    withdrew,
     userId, midiId, date, version, score, combo, accuracy,
     grade: withdrew ? 'W' : getGradeFromAccuracy(accuracy), gradeLevel: withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy),
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
