@@ -736,3 +736,29 @@ exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
 
   date: Date,
 }, {collection: 'docActions'}));
+
+/** @type {import('mongoose').Model<Object>} */
+exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
+  sessionId: ObjectId,
+  userId: ObjectId,
+  date: Date,
+
+  version: String,
+
+  message: String,
+  stack: String,
+  source: String,
+
+  platform: String,
+  runtime: String,
+
+  sampleRate: String,
+  bufferSize: String,
+
+  model: String,
+  name: String,
+  os: String,
+  cpu: String,
+  gpu: String,
+}, {collection: 'errorReports'}));
+

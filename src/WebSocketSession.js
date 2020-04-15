@@ -15,6 +15,7 @@ const {
   Translation, serializeTranslation,
   SessionRecord,
   SessionToken, genSessionTokenHash,
+  ErrorReport,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
 const {midiController} = require('./controllers');
@@ -122,6 +123,7 @@ module.exports = class WebSocketSession {
         case 'ClAppCheckVersion': this.onClAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.onClAppMidiRecordList(id, args); break;
         case 'ClAppTranslate': this.onClAppTranslate(id, args); break;
+        case 'ClAppErrorReport': this.wrapRpcHandler(id, args, this.onClAppErrorReport.bind(this)); break;
         case 'ClAppMidiBundleBuild': this.onClAppMidiBundleBuild(id); break;
         default: debug('unknown rpc', command, args, id); this.returnError(id, 'unknown rpc'); break;
       }
@@ -395,6 +397,27 @@ module.exports = class WebSocketSession {
       debug(e);
       return this.returnError(id, String(e));
     }
+  }
+
+  async onClAppErrorReport(args) {
+    const {
+      version,
+      message, stack, source,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    } = args;
+    debug('  onClAppErrorReport', version, message);
+
+    await ErrorReport.create({
+      sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
+      version,
+      message, stack, source,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    });
+    return null;
   }
 
   async onClAppMidiBundleBuild(id) {
