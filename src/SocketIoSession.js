@@ -271,6 +271,8 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
 
+    this.socket.on('ClVersionList', createRpcHandler(this.onClVersionList.bind(this)));
+
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
 
@@ -1356,5 +1358,13 @@ module.exports = class SocketIoSession {
     debug('  onClWebDocCommentList', docId);
 
     return await commentController.list({docId});
+  }
+
+  async onClVersionList({page}) {
+    page = parseInt(page || 0);
+    debug('  onClVersionList', page);
+
+    const versions = await Build.find({});
+    return versions.map((x) => serializeBuild(x));
   }
 };
