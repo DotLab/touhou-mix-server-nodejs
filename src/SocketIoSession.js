@@ -1364,7 +1364,7 @@ module.exports = class SocketIoSession {
     page = parseInt(page || 0);
     debug('  onClVersionList', page);
 
-    const versions = await Build.find({});
+    const versions = await Build.find({}).sort('-build -date');
     return versions.map((x) => serializeBuild(x));
   }
 };
