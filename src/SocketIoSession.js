@@ -1371,10 +1371,22 @@ module.exports = class SocketIoSession {
     return versions.map((x) => serializeBuild(x));
   }
 
-  async onClErrorList() {
+  async onClErrorList({page, version}) {
+    page = parseInt(page || 0);
+    version = String(version || '');
     debug('  onClErrorList');
 
-    const errors = await ErrorReport.find({}).sort('-date');
+    const pipeline = [];
+    if (version) {
+      pipeline.push({$match: {version}});
+    }
+
+    const errors = await ErrorReport.aggregate([
+      ...pipeline,
+      {$sort: {date: -1}},
+      {$skip: page * MIDI_LIST_PAGE_LIMIT},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+    ]);
     return errors.map((x) => serializeErrorReport(x, {user: this.user}));
   }
 };
