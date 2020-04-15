@@ -31,6 +31,7 @@ const {
   Translation,
   SessionToken, genSessionTokenHash,
   SessionRecord,
+  ErrorReport, serializeErrorReport,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -272,6 +273,8 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
 
     this.socket.on('ClVersionList', createRpcHandler(this.onClVersionList.bind(this)));
+
+    this.socket.on('ClErrorList', createRpcHandler(this.onClErrorList.bind(this)));
 
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
@@ -1366,5 +1369,12 @@ module.exports = class SocketIoSession {
 
     const versions = await Build.find({}).sort('-build -date');
     return versions.map((x) => serializeBuild(x));
+  }
+
+  async onClErrorList() {
+    debug('  onClErrorList');
+
+    const errors = await ErrorReport.find({}).sort('-date');
+    return errors.map((x) => serializeErrorReport(x, {user: this.user}));
   }
 };
