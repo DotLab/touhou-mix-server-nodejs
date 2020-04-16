@@ -356,6 +356,8 @@ exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   // history: [{note: Number, time: Number, delta: Number}],
 
   // cached
+  duration: Number,
+
   withdrew: Boolean,
   score: Number,
   combo: Number,
@@ -751,6 +753,7 @@ exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
   message: String,
   stack: String,
   source: String,
+  exception: Boolean,
 
   platform: String,
   runtime: String,

@@ -289,16 +289,17 @@ module.exports = class WebSocketSession {
   }
 
   async onClAppTrialUpload(id, trial) {
-    const {
+    let {
       hash, withdrew,
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
-      version,
+      version, duration,
     } = trial;
     const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
     const grade = withdrew ? 'W' : getGradeFromAccuracy(accuracy);
     const gradeLevel = withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy);
-    debug('  onClAppTrialUpload', version, hash, grade, gradeLevel, performance, score);
+    duration = parseInt(duration || 0);
+    debug('  onClAppTrialUpload', version, hash, grade, gradeLevel, performance, score, duration);
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
@@ -319,6 +320,9 @@ module.exports = class WebSocketSession {
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
     }
+    this.user = await this.updateUser({$inc: {
+      playTime: duration,
+    }});
 
     await Trial.create({
       userId: this.user._id,
@@ -328,6 +332,7 @@ module.exports = class WebSocketSession {
       withdrew,
       score, combo, accuracy, performance, grade,
       perfectCount, greatCount, goodCount, badCount, missCount,
+      duration,
 
       version,
     });
@@ -402,7 +407,7 @@ module.exports = class WebSocketSession {
       sampleRate, bufferSize,
       model, name, os, cpu, gpu,
     } = args;
-    debug('  onClAppErrorReport', version, message);
+    debug('  onClAppErrorReport', version, message, exception);
 
     await ErrorReport.create({
       sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
