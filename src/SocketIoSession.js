@@ -7,6 +7,7 @@ const ObjectId = mongoose.Types.ObjectId;
 const debug = require('debug')('thmix:SocketIoSession');
 const exec = require('util').promisify(require('child_process').exec);
 const {
+  midiController,
   commentController,
 } = require('./controllers');
 const {
@@ -31,6 +32,7 @@ const {
   SessionToken, genSessionTokenHash,
   SessionRecord,
   Card, serializeCard, createDefaultCard,
+  ErrorReport, serializeErrorReport,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -218,7 +220,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_user_update_password', this.onClWebUserUpdatePassword.bind(this));
     this.socket.on('cl_web_user_upload_avatar', this.onClWebUserUploadAvatar.bind(this));
 
-    this.socket.on('cl_web_midi_get', this.onClWebMidiGet.bind(this));
+    this.socket.on('cl_web_midi_get', createRpcHandler(this.onClWebMidiGet.bind(this)));
     this.socket.on('cl_web_midi_list', this.onClWebMidiList.bind(this));
     this.socket.on('cl_web_midi_upload', this.onClWebMidiUpload.bind(this));
     this.socket.on('cl_web_midi_update', this.onClWebMidiUpdate.bind(this));
@@ -276,6 +278,10 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_translate', this.onClWebTranslate.bind(this));
     this.socket.on('cl_web_translation_list', this.onClWebTranslationList.bind(this));
     this.socket.on('cl_web_translation_update', this.onClWebTranslationUpdate.bind(this));
+
+    this.socket.on('ClVersionList', createRpcHandler(this.onClVersionList.bind(this)));
+
+    this.socket.on('ClErrorList', createRpcHandler(this.onClErrorList.bind(this)));
 
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
@@ -587,24 +593,13 @@ module.exports = class SocketIoSession {
     return success(done, trials.map((x) => serializeTrial(x)));
   }
 
-  async onClWebMidiGet({id}, done) {
+  async onClWebMidiGet({id}) {
     debug('  onClWebMidiGet', id);
 
-    if (!verifyObjectId(id)) return error(done, 'not found');
-
-    // const midi = await Midi.findById(id);
-    // if (!midi) return error(done, 'not found');
-    const query = Midi.aggregate([
-      {$match: {_id: new ObjectId(id)}},
-      {$lookup: {from: 'songs', localField: 'songId', foreignField: '_id', as: 'song'}},
-      {$unwind: {path: '$song', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'albums', localField: 'song.albumId', foreignField: '_id', as: 'album'}},
-      {$unwind: {path: '$album', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'persons', localField: 'authorId', foreignField: '_id', as: 'author'}},
-      {$unwind: {path: '$author', preserveNullAndEmptyArrays: true}},
-    ]);
-    const midi = await query.exec();
-    success(done, serializeMidi(midi[0], {user: this.user}));
+    if (!verifyObjectId(id)) throw codeError(0, 'invalid');
+    id = new ObjectId(id);
+    if (await Midi.count({_id: id}) === 0) throw codeError(1, 'not found');
+    return await midiController.get(id, this.user);
   }
 
   async onClWebMidiList({albumId, songId, status, sort, page, search}, done) {
@@ -1494,5 +1489,32 @@ module.exports = class SocketIoSession {
     debug('  onClWebDocCommentList', docId);
 
     return await commentController.list({docId});
+  }
+
+  async onClVersionList({page}) {
+    page = parseInt(page || 0);
+    debug('  onClVersionList', page);
+
+    const versions = await Build.find({}).sort('-build -date');
+    return versions.map((x) => serializeBuild(x));
+  }
+
+  async onClErrorList({page, version}) {
+    page = parseInt(page || 0);
+    version = String(version || '');
+    debug('  onClErrorList');
+
+    const pipeline = [];
+    if (version) {
+      pipeline.push({$match: {version}});
+    }
+
+    const errors = await ErrorReport.aggregate([
+      ...pipeline,
+      {$sort: {date: -1}},
+      {$skip: page * MIDI_LIST_PAGE_LIMIT},
+      {$limit: MIDI_LIST_PAGE_LIMIT},
+    ]);
+    return errors.map((x) => serializeErrorReport(x, {user: this.user}));
   }
 };

@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 const debug = require('debug')('thmix:WebSocketSession');
-const ObjectId = require('mongoose').Types.ObjectId;
 const {
   UI_APP,
 } = require('./TranslationService');
@@ -12,13 +11,18 @@ const {
   serializeSong,
   serializeAlbum,
   serializePerson,
-  Soundfont,
   DocAction,
   Translation, serializeTranslation,
   SessionRecord,
   SessionToken, genSessionTokenHash,
+  ErrorReport,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
+const {midiController} = require('./controllers');
+
+function codeError(code, error) {
+  return `${error} (${code})`;
+}
 
 const PASSWORD_HASHER = 'sha512';
 const MIDI_LIST_PAGE_LIMIT = 3 * 10;
@@ -28,7 +32,6 @@ const LOVE = 'love'; // 1 to set; 0 to cancel
 const VOTE = 'vote'; // 1 to up; -1 to down;
 
 const MIDIS = 'midis';
-const SOUNDFONTS = 'soundfonts';
 
 function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
@@ -111,19 +114,30 @@ module.exports = class WebSocketSession {
       switch (command) {
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
         case 'ClAppUserLogin': this.onClAppUserLogin(id, args); break;
+        case 'ClAppMidiGet': this.wrapRpcHandler(id, args, this.onClAppMidiGet.bind(this)); break;
         case 'ClAppMidiListQuery': this.onClAppMidiListQuery(id, args); break;
         case 'ClAppMidiDownload': this.onClAppMidiDownload(id, args); break;
         case 'ClAppPing': this.onClAppPing(id, args); break;
-        case 'ClAppDocAction': this.onClAppDocAction(id, args); break;
+        case 'ClAppMidiAction': this.onClAppMidiAction(id, args); break;
         case 'ClAppTrialUpload': this.onClAppTrialUpload(id, args); break;
         case 'ClAppCheckVersion': this.onClAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.onClAppMidiRecordList(id, args); break;
         case 'ClAppTranslate': this.onClAppTranslate(id, args); break;
+        case 'ClAppErrorReport': this.wrapRpcHandler(id, args, this.onClAppErrorReport.bind(this)); break;
         case 'ClAppMidiBundleBuild': this.onClAppMidiBundleBuild(id); break;
         default: debug('unknown rpc', command, args, id); this.returnError(id, 'unknown rpc'); break;
       }
     } catch (e) {
       this.handleError(e);
+    }
+  }
+
+  async wrapRpcHandler(id, args, resolver) {
+    try {
+      const res = await resolver(args);
+      return this.returnSuccess(id, res);
+    } catch (e) {
+      return this.returnError(id, e);
     }
   }
 
@@ -165,11 +179,12 @@ module.exports = class WebSocketSession {
   }
 
   returnSuccess(id, data) {
+    debug('    success', id);
     this.rpc('SvAppHandleRpcResponse', {id, data});
   }
 
   returnError(id, message) {
-    debug('    error', message);
+    debug('    error', id, message);
     this.rpc('SvAppHandleRpcResponse', {id, error: message});
   }
 
@@ -197,6 +212,14 @@ module.exports = class WebSocketSession {
       startDate: new Date(), endDate: new Date(),
     });
     return this.returnSuccess(id, serializeUser(this.user));
+  }
+
+  async onClAppMidiGet({hash}) {
+    debug('  onClAppMidiGet', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) throw codeError(0, 'not found');
+    return await midiController.get(midi._id);
   }
 
   async onClAppMidiListQuery(id, {status, query, sort, page}) {
@@ -253,73 +276,63 @@ module.exports = class WebSocketSession {
     this.returnSuccess(id, time);
   }
 
-  async onClAppDocAction(id, {col, docId, action, value}) {
-    debug('  onClAppDocAction', col, docId, action, value);
+  async onClAppMidiAction(id, {hash, action, value}) {
+    debug('  onClAppMidiAction', hash, action, value);
 
-    if (!ObjectId.isValid(docId)) return this.returnError(id, 'invalid');
-    docId = new ObjectId(docId);
     if (!this.user) return this.returnError(id, 'forbidden');
+    const midi = await Midi.findOne({hash});
+    if (!midi) return this.returnError(id, 'not found');
 
-    let model = null;
-    switch (col) {
-      case MIDIS: model = Midi; break;
-      case SOUNDFONTS: model = Soundfont; break;
-      default: return this.returnError(id, 'not found');
-    }
-
-    const doc = await model.findOne(docId);
-    if (!doc) return this.returnError(id, 'not found');
-
-    await processDocAction(model, col, this.user.id, docId, action, value);
+    await processDocAction(Midi, MIDIS, this.user.id, midi._id, action, value);
 
     this.returnSuccess(id);
   }
 
   async onClAppTrialUpload(id, trial) {
-    const {
-      hash,
+    let {
+      hash, withdrew,
       score, combo, accuracy,
       perfectCount, greatCount, goodCount, badCount, missCount,
-      version,
+      version, duration,
     } = trial;
     const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
-    debug('  onClAppTrialUpload', version, hash, getGradeFromAccuracy(accuracy));
+    const grade = withdrew ? 'W' : getGradeFromAccuracy(accuracy);
+    const gradeLevel = withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy);
+    duration = parseInt(duration || 0);
+    debug('  onClAppTrialUpload', version, hash, grade, gradeLevel, performance, score, duration);
 
     if (version !== TRIAL_SCORING_VERSION) return this.returnError(id, 'forbidden');
     if (!this.user) return this.returnError(id, 'forbidden');
-
-    const gradeLevel = getGradeLevelFromAccuracy(accuracy);
-    const countFieldName = gradeLevel.toLowerCase() + 'Count';
-
-    this.user = await this.updateUser({
-      $inc: {
-        trialCount: 1,
-        [countFieldName]: 1,
-        score,
-        combo,
-        performance,
-        accuracy,
-      },
-    });
-    const midi = await Midi.findOneAndUpdate({hash}, {
-      $inc: {
-        trialCount: 1,
-        [countFieldName]: 1,
-        score,
-        combo,
-        performance,
-        accuracy,
-      },
-    });
+    let midi = await Midi.findOne({hash});
     if (!midi) return this.returnError(id, 'not found');
+
+    const countFieldName = gradeLevel.toLowerCase() + 'Count';
+    const $inc = {
+      trialCount: 1,
+      [countFieldName]: 1,
+      score,
+      combo,
+      performance,
+      accuracy,
+    };
+
+    if (!withdrew) {
+      this.user = await this.updateUser({$inc});
+      midi = await Midi.findOneAndUpdate({hash}, {$inc});
+    }
+    this.user = await this.updateUser({$inc: {
+      playTime: duration,
+    }});
 
     await Trial.create({
       userId: this.user._id,
       midiId: midi._id,
       date: new Date(),
 
-      score, combo, accuracy, performance, grade: getGradeFromAccuracy(accuracy),
+      withdrew,
+      score, combo, accuracy, performance, grade,
       perfectCount, greatCount, goodCount, badCount, missCount,
+      duration,
 
       version,
     });
@@ -384,6 +397,27 @@ module.exports = class WebSocketSession {
       debug(e);
       return this.returnError(id, String(e));
     }
+  }
+
+  async onClAppErrorReport(args) {
+    const {
+      version,
+      message, stack, source, exception,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    } = args;
+    debug('  onClAppErrorReport', version, message, exception);
+
+    await ErrorReport.create({
+      sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
+      version,
+      message, stack, source, exception,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    });
+    return null;
   }
 
   async onClAppMidiBundleBuild(id) {

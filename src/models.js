@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
-const {ROLE_MIDI_MOD, checkUserRole} = require('./services/RoleService');
+const {ROLE_MIDI_MOD, ROLE_SITE_OWNER, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
 // const BUCKET_URL = 'https://storage.cloud.google.com/scarletea';
@@ -357,6 +357,9 @@ exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   // history: [{note: Number, time: Number, delta: Number}],
 
   // cached
+  duration: Number,
+
+  withdrew: Boolean,
   score: Number,
   combo: Number,
   accuracy: Number,
@@ -410,6 +413,7 @@ exports.getPassFailFromAccuracy = getPassFailFromAccuracy;
 exports.serializeTrial = function(trial) {
   let {
     id,
+    withdrew,
     userId, midiId, date, version, score, combo, accuracy,
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
     userName, userAvatarUrl,
@@ -419,8 +423,9 @@ exports.serializeTrial = function(trial) {
   }
   return {
     id,
+    withdrew,
     userId, midiId, date, version, score, combo, accuracy,
-    grade: getGradeFromAccuracy(accuracy), gradeLevel: getGradeLevelFromAccuracy(accuracy),
+    grade: withdrew ? 'W' : getGradeFromAccuracy(accuracy), gradeLevel: withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy),
     performance, perfectCount, greatCount, goodCount, badCount, missCount, midi, song, album,
     userName, userAvatarUrl,
   };
@@ -811,3 +816,52 @@ exports.DocAction = mongoose.model('DocAction', new mongoose.Schema({
 
   date: Date,
 }, {collection: 'docActions'}));
+
+/** @type {import('mongoose').Model<Object>} */
+exports.ErrorReport = mongoose.model('ErrorReport', new mongoose.Schema({
+  sessionId: ObjectId,
+  userId: ObjectId,
+  date: Date,
+
+  version: String,
+
+  message: String,
+  stack: String,
+  source: String,
+  exception: Boolean,
+
+  platform: String,
+  runtime: String,
+
+  sampleRate: String,
+  bufferSize: String,
+
+  model: String,
+  name: String,
+  os: String,
+  cpu: String,
+  gpu: String,
+}, {collection: 'errorReports'}));
+
+exports.serializeErrorReport = function(errorReport, context) {
+  const {
+    _id,
+    sessionId, userId, date, version, message, stack, exception,
+    source, platform, runtime, sampleRate, bufferSize,
+    model, name, os, cpu, gpu,
+  } = errorReport;
+
+  if (context && context.user && checkUserRole(context.user.roles, ROLE_SITE_OWNER)) {
+    return {
+      id: _id,
+      sessionId, userId, date, version, message, stack, exception,
+      source, platform, runtime, sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    };
+  }
+  return {
+    id: _id,
+    date, version, message, stack, exception, platform, runtime,
+  };
+};
+
