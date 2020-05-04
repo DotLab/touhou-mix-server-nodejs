@@ -32,6 +32,7 @@ const {
   SessionToken, genSessionTokenHash,
   SessionRecord,
   ErrorReport, serializeErrorReport,
+  Card, createDefaultCard, serializeCard,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -256,6 +257,12 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
     this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+
+    this.socket.on('ClWebCardCreate', createRpcHandler(this.onClWebCardCreate.bind(this)));
+    this.socket.on('ClWebCardGet', createRpcHandler(this.onClWebCardGet.bind(this)));
+    this.socket.on('ClWebCardUploadCover', createRpcHandler(this.onClWebCardUploadCover.bind(this)));
+    this.socket.on('ClWebCardUpdate', createRpcHandler(this.onClWebCardUpdate.bind(this)));
+    // this.socket.on('ClWebCardList', createRpcHandler(this.onClWebCardList.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1388,5 +1395,90 @@ module.exports = class SocketIoSession {
       {$limit: MIDI_LIST_PAGE_LIMIT},
     ]);
     return errors.map((x) => serializeErrorReport(x, {user: this.user}));
+  }
+
+  async onClWebCardCreate() {
+    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+
+    const card = await Card.create({
+      ...createDefaultCard(),
+      uploaderId: this.user.id,
+    });
+    return {id: card.id};
+  }
+
+  async onClWebCardGet({id}) {
+    debug('  ClWebCardGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const card = await Card.findById(id);
+    if (!card) throw codeError(0, 'not found');
+
+    return serializeCard(card);
+  }
+
+  async onClWebCardUploadCover({id, size, buffer, type}, done) {
+    debug('  onClWebCardUploadCover', id, size, buffer.length, type);
+
+    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+    if (size !== buffer.length) throw codeError(2, 'tampering with api');
+    if (size > MB) throw codeError(2, 'too large');
+
+    let card = await Card.findById(id);
+    if (!card) throw codeError(3, 'not found');
+    if (!card.uploaderId.equals(this.user.id)) throw codeError(4, ERROR_FORBIDDEN);
+
+    const paths = await this.uploadCover(buffer);
+    switch (type) {
+      case 'portrait':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          portraitPath: paths.path,
+        }}, {new: true});
+        break;
+
+      case 'cover':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          coverPath: paths.path,
+        }}, {new: true});
+        break;
+
+      case 'background':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          backgroundPath: paths.path,
+        }}, {new: true});
+        break;
+
+      case 'icon':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          iconPath: paths.path,
+        }}, {new: true});
+        break;
+    }
+
+    return serializeCard(card);
+  }
+
+  async onClWebCardUpdate(update) {
+    debug('  onClWebCardUpdate', update.id);
+
+    const {
+      id, name, desc, rarity,
+    } = update;
+
+    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let card = await Card.findById(id);
+    if (!card) throw codeError(2, 'not found');
+    if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    update = filterUndefinedKeys({
+      name, desc, rarity,
+    });
+
+    card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
+    return serializeCard(card);
   }
 };
