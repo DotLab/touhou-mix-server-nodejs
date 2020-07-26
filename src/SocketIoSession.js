@@ -291,12 +291,13 @@ module.exports = class SocketIoSession {
 
     const playerCount = await User.count({});
     const onlineCount = Object.keys(this.server.sessions).length;
-    if (this.server.peakOnlineCount < onlineCount) {
-      this.server.peakOnlineCount = onlineCount;
+    const gameCount = Object.keys(this.server.webSocketServer.sessionDict).length;
+    if (this.server.peakOnlineCount < onlineCount + gameCount) {
+      this.server.peakOnlineCount = onlineCount + gameCount;
     }
     return {
       revision: this.server.revision,
-      playerCount, onlineCount,
+      playerCount, onlineCount, gameCount,
       peakOnlineCount: this.server.peakOnlineCount,
     };
   }

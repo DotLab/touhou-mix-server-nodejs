@@ -25,6 +25,9 @@ module.exports = class SocketIoServer {
 
     this.peakOnlineCount = 0;
 
+    /** @type {import('./WebSocketServer')} */
+    this.webSocketServer = null;
+
     this.revision = require('child_process')
         .execSync('git rev-parse HEAD')
         .toString().trim();
