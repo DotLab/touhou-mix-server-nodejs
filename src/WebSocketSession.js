@@ -402,22 +402,21 @@ module.exports = class WebSocketSession {
   async onClAppErrorReport(args) {
     const {
       version,
-      message, exception,
-      // message, stack, source, exception,
-      // platform, runtime,
-      // sampleRate, bufferSize,
-      // model, name, os, cpu, gpu,
+      message, stack, source, exception,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
     } = args;
     debug('  onClAppErrorReport', version, message, exception);
 
-    // await ErrorReport.create({
-    //   sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
-    //   version,
-    //   message, stack, source, exception,
-    //   platform, runtime,
-    //   sampleRate, bufferSize,
-    //   model, name, os, cpu, gpu,
-    // });
+    await ErrorReport.create({
+      sessionId: this.sessionRecord && this.sessionRecord._id, userId: this.user && this.user._id, date: new Date(),
+      version,
+      message, stack, source, exception,
+      platform, runtime,
+      sampleRate, bufferSize,
+      model, name, os, cpu, gpu,
+    });
     return null;
   }
 
