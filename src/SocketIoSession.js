@@ -279,6 +279,8 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
 
+    this.socket.on('ClWebMidiAlbumList', createRpcHandler(this.onClWebMidiAlbumList.bind(this)));
+
     this.socket.on('ClWebServerStatus', createRpcHandler(this.onClWebServerStatus.bind(this)));
   }
 
@@ -1389,5 +1391,17 @@ module.exports = class SocketIoSession {
       {$limit: MIDI_LIST_PAGE_LIMIT},
     ]);
     return errors.map((x) => serializeErrorReport(x, {user: this.user}));
+  }
+
+  async onClWebMidiAlbumList() {
+    debug('  onClWebMidiAlbumList');
+
+    const res = await Midi.aggregate([
+      {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
+      {$project: {sourceAlbumName: 1, sourceSongName: 1}},
+      {$group: {_id: '$sourceAlbumName', songs: {$push: '$sourceSongName'}, midis: {$push: '$_id'}}},
+      {$addFields: {name: '$_id'}},
+    ]);
+    return res;
   }
 };
