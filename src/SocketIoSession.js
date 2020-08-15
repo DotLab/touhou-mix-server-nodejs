@@ -685,6 +685,9 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebTranslate({src, lang, namespace}, done) {
+    if (!src) {
+      return success(done);
+    }
     debug('  onClWebTranslate', src, lang, namespace);
 
     try {
@@ -1399,7 +1402,8 @@ module.exports = class SocketIoSession {
     const res = await Midi.aggregate([
       {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
       {$project: {sourceAlbumName: 1, sourceSongName: 1}},
-      {$group: {_id: '$sourceAlbumName', songs: {$push: '$sourceSongName'}, midis: {$push: '$_id'}}},
+      {$group: {_id: '$sourceAlbumName', songs: {$push: '$$ROOT'}, albumMidis: {$push: '$_id'}}},
+      // {$project: {'songs.name': '$songs.sourceSongName', 'songs.midi': '$songs._id'}},
       {$addFields: {name: '$_id'}},
     ]);
     return res;
