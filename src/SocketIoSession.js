@@ -279,7 +279,7 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
 
-    this.socket.on('ClWebMidiAlbumList', createRpcHandler(this.onClWebMidiAlbumList.bind(this)));
+    this.socket.on('ClWebMidiCustomizedAlbumList', createRpcHandler(this.onClWebMidiCustomizedAlbumList.bind(this)));
 
     this.socket.on('ClWebServerStatus', createRpcHandler(this.onClWebServerStatus.bind(this)));
   }
@@ -1396,8 +1396,8 @@ module.exports = class SocketIoSession {
     return errors.map((x) => serializeErrorReport(x, {user: this.user}));
   }
 
-  async onClWebMidiAlbumList() {
-    debug('  onClWebMidiAlbumList');
+  async onClWebMidiCustomizedAlbumList() {
+    debug('  onClWebMidiCustomizedAlbumList');
 
     const res = await Midi.aggregate([
       {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
