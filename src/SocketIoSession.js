@@ -1403,7 +1403,6 @@ module.exports = class SocketIoSession {
       {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
       {$project: {sourceAlbumName: 1, sourceSongName: 1}},
       {$group: {_id: '$sourceAlbumName', songs: {$push: '$$ROOT'}, albumMidis: {$push: '$_id'}}},
-      // {$project: {'songs.name': '$songs.sourceSongName', 'songs.midi': '$songs._id'}},
       {$addFields: {name: '$_id'}},
     ]);
     return res;
