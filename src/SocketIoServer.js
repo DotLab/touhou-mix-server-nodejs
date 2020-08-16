@@ -1,5 +1,6 @@
 const debug = require('debug')('thmix:SocketIoServer');
 const SocketIoSession = require('./SocketIoSession');
+const {User} = require('./models');
 
 const VERSION = 0;
 
@@ -27,6 +28,11 @@ module.exports = class SocketIoServer {
 
     /** @type {import('./WebSocketServer')} */
     this.webSocketServer = null;
+
+    setInterval(() => {
+      debug('new day login');
+      User.updateMany({newDay: false}, {$set: {newDay: true}}).exec();
+    }, 1000 * 60 * 60 * 24);
 
     this.revision = require('child_process')
         .execSync('git rev-parse HEAD')
