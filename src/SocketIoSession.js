@@ -286,6 +286,8 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebDocCommentCreate', createRpcHandler(this.onClWebDocCommentCreate.bind(this)));
     this.socket.on('ClWebDocCommentList', createRpcHandler(this.onClWebDocCommentList.bind(this)));
 
+    this.socket.on('ClWebMidiCustomizedAlbumList', createRpcHandler(this.onClWebMidiCustomizedAlbumList.bind(this)));
+
     this.socket.on('ClWebServerStatus', createRpcHandler(this.onClWebServerStatus.bind(this)));
   }
 
@@ -298,12 +300,13 @@ module.exports = class SocketIoSession {
 
     const playerCount = await User.count({});
     const onlineCount = Object.keys(this.server.sessions).length;
-    if (this.server.peakOnlineCount < onlineCount) {
-      this.server.peakOnlineCount = onlineCount;
+    const gameCount = Object.keys(this.server.webSocketServer.sessionDict).length;
+    if (this.server.peakOnlineCount < onlineCount + gameCount) {
+      this.server.peakOnlineCount = onlineCount + gameCount;
     }
     return {
       revision: this.server.revision,
-      playerCount, onlineCount,
+      playerCount, onlineCount, gameCount,
       peakOnlineCount: this.server.peakOnlineCount,
     };
   }
@@ -689,6 +692,9 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebTranslate({src, lang, namespace}, done) {
+    if (!src) {
+      return success(done);
+    }
     debug('  onClWebTranslate', src, lang, namespace);
 
     try {
@@ -1480,5 +1486,17 @@ module.exports = class SocketIoSession {
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
     return serializeCard(card);
+  }
+
+  async onClWebMidiCustomizedAlbumList() {
+    debug('  onClWebMidiCustomizedAlbumList');
+
+    const res = await Midi.aggregate([
+      {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
+      {$project: {sourceAlbumName: 1, sourceSongName: 1}},
+      {$group: {_id: '$sourceAlbumName', songs: {$push: '$$ROOT'}, albumMidis: {$push: '$_id'}}},
+      {$addFields: {name: '$_id'}},
+    ]);
+    return res;
   }
 };

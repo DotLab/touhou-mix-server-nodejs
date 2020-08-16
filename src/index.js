@@ -92,6 +92,7 @@ const bucketService = new BucketService(storage, tempPath, 'microvolt-bucket-1')
 
 const WebSocketServer = require('./WebSocketServer');
 const webSocketServer = new WebSocketServer(wsServer, {bucketService, translationService});
+socketIoServer.webSocketServer = webSocketServer;
 
 process.stdin.resume();
 
