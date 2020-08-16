@@ -262,7 +262,7 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardGet', createRpcHandler(this.onClWebCardGet.bind(this)));
     this.socket.on('ClWebCardUploadCover', createRpcHandler(this.onClWebCardUploadCover.bind(this)));
     this.socket.on('ClWebCardUpdate', createRpcHandler(this.onClWebCardUpdate.bind(this)));
-    // this.socket.on('ClWebCardList', createRpcHandler(this.onClWebCardList.bind(this)));
+    this.socket.on('ClWebCardList', createRpcHandler(this.onClWebCardList.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1409,6 +1409,7 @@ module.exports = class SocketIoSession {
     const card = await Card.create({
       ...createDefaultCard(),
       uploaderId: this.user.id,
+      date: new Date(),
     });
     return {id: card.id};
   }
@@ -1424,7 +1425,7 @@ module.exports = class SocketIoSession {
     return serializeCard(card);
   }
 
-  async onClWebCardUploadCover({id, size, buffer, type}, done) {
+  async onClWebCardUploadCover({id, size, buffer, type}) {
     debug('  onClWebCardUploadCover', id, size, buffer.length, type);
 
     if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
@@ -1470,7 +1471,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebCardUpdate', update.id);
 
     const {
-      id, name, desc, rarity,
+      id, name, desc, rarity, attribute,
     } = update;
 
     if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
@@ -1481,11 +1482,21 @@ module.exports = class SocketIoSession {
     if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
-      name, desc, rarity,
+      name, desc, rarity, attribute,
     });
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
     return serializeCard(card);
+  }
+
+  async onClWebCardList() {
+    const sort = String('-date');
+    debug('  onClWebCardList');
+
+    const cards = await Card.find({})
+        .sort(sort);
+
+    return cards.map((card) => serializeCard(card));
   }
 
   async onClWebMidiCustomizedAlbumList() {

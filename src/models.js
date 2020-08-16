@@ -804,7 +804,7 @@ const CardSchema = new mongoose.Schema({
   iconPath: String,
   // // main -------------------------------------------------------------------------
   rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
-  // attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
+  attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
 
   // // parameters -------------------------------------------------------------------------
   // spInit: {type: Number, required: true, min: 1, max: 4},
@@ -836,7 +836,7 @@ exports.createDefaultCard = function() {
   return {
     // meta
     rarity: 'n',
-    // attribute: 'ma',
+    attribute: 'ma',
     name: '',
     desc: '',
 
