@@ -33,6 +33,7 @@ const {
   SessionRecord,
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
+  CardPool, createDefaultCardPool, serializeCardPool,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -263,6 +264,11 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardUploadCover', createRpcHandler(this.onClWebCardUploadCover.bind(this)));
     this.socket.on('ClWebCardUpdate', createRpcHandler(this.onClWebCardUpdate.bind(this)));
     this.socket.on('ClWebCardList', createRpcHandler(this.onClWebCardList.bind(this)));
+
+    this.socket.on('ClWebCardPoolCreate', createRpcHandler(this.onClWebCardPoolCreate.bind(this)));
+    this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
+    this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
+    this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1489,14 +1495,78 @@ module.exports = class SocketIoSession {
     return serializeCard(card);
   }
 
-  async onClWebCardList() {
+  async onClWebCardList({rarity}) {
     const sort = String('-date');
     debug('  onClWebCardList');
 
-    const cards = await Card.find({})
-        .sort(sort);
+    let cards;
+    if (rarity) {
+      cards = await Card.find({rarity}).sort(sort);
+    } else {
+      cards = await Card.find({}).sort(sort);
+    }
 
     return cards.map((card) => serializeCard(card));
+  }
+
+  async onClWebCardPoolCreate() {
+    debug('  onClWebCardPoolCreate');
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const cardPool = await CardPool.create({
+      ...createDefaultCardPool(),
+      uploaderId: this.user.id,
+      uploaderName: this.user.name,
+      uploaderAvatarUrl: this.user.avatarUrl,
+      date: new Date(),
+    });
+    return {id: cardPool.id};
+  }
+
+  async onClWebCardPoolGet({id}) {
+    debug('  ClWebCardPoolGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const cardPool = await CardPool.findById(id);
+    if (!cardPool) throw codeError(0, 'not found');
+
+    return serializeCardPool(cardPool);
+  }
+
+  async onClWebCardPoolUpdate(update) {
+    debug('  onClWebCardPoolUpdate', update.id);
+
+    const {
+      id,
+      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    } = update;
+
+    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let cardPool = await CardPool.findById(id);
+    if (!cardPool) throw codeError(2, 'not found');
+    if (!cardPool.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    update = filterUndefinedKeys({
+      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    });
+
+    cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
+    return serializeCardPool(cardPool);
+  }
+
+  async onClWebCardPoolList() {
+    const sort = String('-date');
+    debug('  onClWebCardPoolList');
+
+    const cardPools = await CardPool.find({})
+        .sort(sort);
+
+    return cardPools.map((cardPool) => serializeCardPool(cardPool));
   }
 
   async onClWebMidiCustomizedAlbumList() {

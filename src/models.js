@@ -876,3 +876,64 @@ exports.serializeCard = function(card) {
   };
 };
 
+/** @type {import('mongoose').Model<Object>} */
+exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
+  uploaderId: ObjectId,
+  uploaderName: String,
+  uploaderAvatarUrl: String,
+
+  date: Date,
+  name: String,
+  desc: String,
+  cost: Number,
+
+  nWeight: Number,
+  rWeight: Number,
+  srWeight: Number,
+  ssrWeight: Number,
+  urWeight: Number,
+
+  nCards: Array,
+  rCards: Array,
+  srCards: Array,
+  ssrCards: Array,
+  urCards: Array,
+}));
+
+exports.serializeCardPool = function(CardPool) {
+  const {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, date, name,
+    cost, desc, nCards, rCards, srCards, ssrCards, urCards,
+    nWeight, rWeight, srWeight, ssrWeight, urWeight,
+  } = CardPool;
+  return {
+    id,
+    uploaderId, uploaderName, uploaderAvatarUrl, date, name, desc,
+    cost, nCards, rCards, srCards, ssrCards, urCards,
+    nWeight, rWeight, srWeight, ssrWeight, urWeight,
+  };
+};
+
+exports.createDefaultCardPool = function() {
+  return {
+    uploaderId: null,
+    uploaderName: '',
+    uploaderAvatarUrl: '',
+
+    name: '',
+    desc: '',
+    cost: 0,
+    nWeight: 1,
+    rWeight: 1,
+    srWeight: 1,
+    ssrWeight: 1,
+    urWeight: 1,
+
+    nCards: [],
+    rCards: [],
+    srCards: [],
+    ssrCards: [],
+    urCards: [],
+  };
+};
