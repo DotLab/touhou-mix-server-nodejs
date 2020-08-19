@@ -1477,7 +1477,7 @@ module.exports = class SocketIoSession {
     debug('  onClWebCardUpdate', update.id);
 
     const {
-      id, name, desc, rarity, attribute,
+      id, name, desc, rarity, attribute, picSource,
     } = update;
 
     if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
@@ -1488,7 +1488,7 @@ module.exports = class SocketIoSession {
     if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
-      name, desc, rarity, attribute,
+      name, desc, rarity, attribute, picSource,
     });
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
