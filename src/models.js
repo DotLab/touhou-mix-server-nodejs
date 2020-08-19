@@ -797,6 +797,7 @@ const CardSchema = new mongoose.Schema({
   name: String,
   desc: String,
   picSource: String,
+  picAuthorName: String,
 
   hash: String,
   portraitPath: String,
@@ -841,6 +842,7 @@ exports.createDefaultCard = function() {
     name: '',
     desc: '',
     picSource: '',
+    picAuthorName: '',
 
     // spInit: 1,
     // spMax: 4,
@@ -857,7 +859,7 @@ exports.serializeCard = function(card) {
   let {
     _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource,
+    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
     uploader,
   } = card;
@@ -868,7 +870,7 @@ exports.serializeCard = function(card) {
   return {
     id: _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource,
+    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
     portraitUrl: portraitPath ? BUCKET_URL + portraitPath : null,
     coverUrl: coverPath ? BUCKET_URL + coverPath : null,
     backgroundUrl: backgroundPath ? BUCKET_URL + backgroundPath : null,
