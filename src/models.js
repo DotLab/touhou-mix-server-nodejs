@@ -39,7 +39,7 @@ exports.User = mongoose.model('User', new mongoose.Schema({
   performance: Number,
   ranking: Number,
   gold: Number,
-  newDay: Boolean,
+  rewardNewDayLogin: Boolean,
 
   sCount: Number,
   aCount: Number,
@@ -91,7 +91,7 @@ exports.createDefaultUser = function() {
     performance: 0,
     ranking: 0,
     gold: 0,
-    newDay: true,
+    rewardNewDayLogin: true,
     sCount: 0,
     aCount: 0,
     bCount: 0,

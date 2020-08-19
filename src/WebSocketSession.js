@@ -198,10 +198,10 @@ module.exports = class WebSocketSession {
     if (hash !== user.hash) return this.returnError(id, 'wrong combination');
 
     this.user = user;
-    if (user.newDay) {
+    if (user.rewardNewDayLogin) {
       await User.updateOne({_id: user._id}, {$inc: {gold: 10}});
     }
-    this.user = await this.updateUser({seenDate: new Date(), newDay: false});
+    this.user = await this.updateUser({seenDate: new Date(), rewardNewDayLogin: false});
 
     await SessionToken.updateMany({userId: user._id, valid: true}, {
       $set: {valid: false, invalidatedDate: new Date()},
