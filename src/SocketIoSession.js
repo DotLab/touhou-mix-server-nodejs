@@ -1618,8 +1618,8 @@ module.exports = class SocketIoSession {
     const cardPool = await CardPool.findById(id);
     if (!cardPool) throw codeError(0, 'not found');
 
-    if (this.user.gold < cardPool.cost) throw codeError(1, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: cardPool.cost}});
+    if (!this.user.gold || this.user.gold < cardPool.cost) throw codeError(1, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost}});
 
     const nRate = (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
     const rRate = (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
@@ -1659,8 +1659,9 @@ module.exports = class SocketIoSession {
     const cardPool = await CardPool.findById(id);
     if (!cardPool) throw codeError(0, 'not found');
     if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
-    if (this.user.gold < cardPool.cost * 10) throw codeError(2, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: cardPool.cost * 10}});
+
+    if (!this.user.gold || this.user.gold < cardPool.cost * 10) throw codeError(2, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost * 10}});
 
     const nRate = (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
     const rRate = (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
