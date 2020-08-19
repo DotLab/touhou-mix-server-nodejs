@@ -937,3 +937,10 @@ exports.createDefaultCardPool = function() {
     urCards: [],
   };
 };
+
+/** @type {import('mongoose').Model<Object>} */
+exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
+  userId: ObjectId,
+  cardId: ObjectId,
+  date: Date,
+}));

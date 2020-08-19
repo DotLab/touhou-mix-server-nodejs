@@ -34,6 +34,7 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
+  UserHasCard,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -1650,6 +1651,8 @@ module.exports = class SocketIoSession {
     if (ran === arr.length) ran = arr.length - 1;
     const card = await Card.findById(new ObjectId(arr[ran]));
     if (!card) throw codeError(2, 'not found');
+
+    await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
     return serializeCard(card);
   }
 
@@ -1694,6 +1697,7 @@ module.exports = class SocketIoSession {
       if (ran === arr.length) ran = arr.length - 1;
       const card = await Card.findById(new ObjectId(arr[ran]));
       if (!card) throw codeError(3, 'not found');
+      await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
       res.push(card);
     }
 
