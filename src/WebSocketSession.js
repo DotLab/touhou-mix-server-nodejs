@@ -198,7 +198,10 @@ module.exports = class WebSocketSession {
     if (hash !== user.hash) return this.returnError(id, 'wrong combination');
 
     this.user = user;
-    this.user = await this.updateUser({seenDate: new Date()});
+    if (user.rewardNewDayLogin) {
+      await User.updateOne({_id: user._id}, {$inc: {gold: 10}});
+    }
+    this.user = await this.updateUser({seenDate: new Date(), rewardNewDayLogin: false});
 
     await SessionToken.updateMany({userId: user._id, valid: true}, {
       $set: {valid: false, invalidatedDate: new Date()},
@@ -296,6 +299,7 @@ module.exports = class WebSocketSession {
       version, duration,
     } = trial;
     const performance = Math.log(1 + score) * Math.pow(accuracy, 2);
+    const gold = Math.ceil(performance);
     const grade = withdrew ? 'W' : getGradeFromAccuracy(accuracy);
     const gradeLevel = withdrew ? 'F' : getGradeLevelFromAccuracy(accuracy);
     duration = parseInt(duration || 0);
@@ -313,6 +317,7 @@ module.exports = class WebSocketSession {
       score,
       combo,
       performance,
+      gold,
       accuracy,
     };
 

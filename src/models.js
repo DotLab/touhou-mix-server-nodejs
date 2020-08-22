@@ -38,6 +38,8 @@ exports.User = mongoose.model('User', new mongoose.Schema({
   onlineTime: Number,
   performance: Number,
   ranking: Number,
+  gold: Number,
+  rewardNewDayLogin: Boolean,
 
   sCount: Number,
   aCount: Number,
@@ -53,7 +55,7 @@ exports.serializeUser = function(user) {
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
-    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
@@ -61,7 +63,7 @@ exports.serializeUser = function(user) {
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
-    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
     passCount: trialCount - fCount, failCount: fCount,
   };
 };
@@ -88,6 +90,8 @@ exports.createDefaultUser = function() {
     playTime: 0,
     performance: 0,
     ranking: 0,
+    gold: 0,
+    rewardNewDayLogin: true,
     sCount: 0,
     aCount: 0,
     bCount: 0,
