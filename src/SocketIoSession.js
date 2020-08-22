@@ -13,6 +13,7 @@ const {
 const {
   ROLE_MIDI_MOD,
   ROLE_MIDI_ADMIN,
+  ROLE_CARD_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -1410,7 +1411,7 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebCardCreate() {
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const card = await Card.create({
       ...createDefaultCard(),
@@ -1425,16 +1426,19 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const card = await Card.findById(id);
+    const card = await Card.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}}]);
+
     if (!card) throw codeError(0, 'not found');
 
-    return serializeCard(card);
+    return serializeCard(card[0]);
   }
 
   async onClWebCardUploadCover({id, size, buffer, type}) {
     debug('  onClWebCardUploadCover', id, size, buffer.length, type);
 
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
     if (size !== buffer.length) throw codeError(2, 'tampering with api');
     if (size > MB) throw codeError(2, 'too large');
@@ -1475,12 +1479,14 @@ module.exports = class SocketIoSession {
 
   async onClWebCardUpdate(update) {
     debug('  onClWebCardUpdate', update.id);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const {
-      id, name, desc, rarity, attribute, picSource, picAuthorName,
+      id, name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     } = update;
 
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
 
     let card = await Card.findById(id);
@@ -1488,7 +1494,9 @@ module.exports = class SocketIoSession {
     if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
-      name, desc, rarity, attribute, picSource, picAuthorName,
+      name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     });
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
@@ -1498,32 +1506,22 @@ module.exports = class SocketIoSession {
   async onClWebCardList({rarity}) {
     debug('  onClWebCardList');
 
-    let cards;
-    if (rarity) {
-      cards = await Card.aggregate([
-        {$match: {rarity: rarity}},
-        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
-        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
-        {$sort: {date: -1}}]);
-    } else {
-      cards = await Card.aggregate([
-        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
-        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
-        {$sort: {date: -1}}]);
-    }
+    const cards = await Card.aggregate([
+      ...(rarity ? [{$match: {rarity}}] : []),
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
+      {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+      {$sort: {date: -1}}]);
 
     return cards.map((card) => serializeCard(card));
   }
 
   async onClWebCardPoolCreate() {
     debug('  onClWebCardPoolCreate');
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const cardPool = await CardPool.create({
       ...createDefaultCardPool(),
-      uploaderId: this.user.id,
-      uploaderName: this.user.name,
-      uploaderAvatarUrl: this.user.avatarUrl,
+      creatorId: this.user.id,
       date: new Date(),
     });
     return {id: cardPool.id};
@@ -1534,8 +1532,11 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const cardPool = await CardPool.findById(id);
-    if (!cardPool) throw codeError(0, 'not found');
+    const cardPool = await CardPool.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'creatorId', foreignField: '_id', as: 'creator'}}]);
+
+    if (!cardPool) throw codeError(1, 'not found');
 
     return serializeCardPool(cardPool);
   }
@@ -1549,7 +1550,7 @@ module.exports = class SocketIoSession {
       nWeight, rWeight, srWeight, ssrWeight, urWeight,
     } = update;
 
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
 
     let cardPool = await CardPool.findById(id);

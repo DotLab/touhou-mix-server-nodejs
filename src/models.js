@@ -4,8 +4,7 @@ const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
 const {ROLE_MIDI_MOD, ROLE_SITE_OWNER, checkUserRole} = require('./services/RoleService');
 
-// const BUCKET_URL = 'https://storage.thmix.org';
-const BUCKET_URL = 'https://storage.cloud.google.com/scarletea';
+const BUCKET_URL = 'https://storage.thmix.org';
 
 exports.connectDatabase = async function(database) {
   const mongoose = require('mongoose');
@@ -796,8 +795,15 @@ const CardSchema = new mongoose.Schema({
   date: Date,
   name: String,
   desc: String,
-  picSource: String,
-  picAuthorName: String,
+
+  portraitSource: String,
+  portraitAuthorName: String,
+  coverSource: String,
+  coverAuthorName: String,
+  backgroundSource: String,
+  backgroundAuthorName: String,
+  iconSource: String,
+  iconAuthorName: String,
 
   hash: String,
   portraitPath: String,
@@ -826,7 +832,7 @@ CardSchema.index({
   name: 'text',
   desc: 'text',
   rarity: 'text',
-  // attribute: 'text',
+  attribute: 'text',
 }, {name: 'text_index'});
 
 /** @type {import('mongoose').Model<Object>} */
@@ -841,8 +847,15 @@ exports.createDefaultCard = function() {
     attribute: 'ma',
     name: '',
     desc: '',
-    picSource: '',
-    picAuthorName: '',
+
+    portraitSource: '',
+    portraitAuthorName: '',
+    coverSource: '',
+    coverAuthorName: '',
+    backgroundSource: '',
+    backgroundAuthorName: '',
+    iconSource: '',
+    iconAuthorName: '',
 
     // spInit: 1,
     // spMax: 4,
@@ -859,7 +872,9 @@ exports.serializeCard = function(card) {
   let {
     _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
     uploader,
   } = card;
@@ -870,7 +885,9 @@ exports.serializeCard = function(card) {
   return {
     id: _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     portraitUrl: portraitPath ? BUCKET_URL + portraitPath : null,
     coverUrl: coverPath ? BUCKET_URL + coverPath : null,
     backgroundUrl: backgroundPath ? BUCKET_URL + backgroundPath : null,
@@ -882,9 +899,7 @@ exports.serializeCard = function(card) {
 
 /** @type {import('mongoose').Model<Object>} */
 exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
-  uploaderId: ObjectId,
-  uploaderName: String,
-  uploaderAvatarUrl: String,
+  creatorId: ObjectId,
 
   date: Date,
   name: String,
@@ -897,33 +912,34 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   ssrWeight: Number,
   urWeight: Number,
 
-  nCards: Array,
-  rCards: Array,
-  srCards: Array,
-  ssrCards: Array,
-  urCards: Array,
+  nCards: [{cardId: ObjectId, weight: Number}],
+  rCards: [{cardId: ObjectId, weight: Number}],
+  srCards: [{cardId: ObjectId, weight: Number}],
+  ssrCards: [{cardId: ObjectId, weight: Number}],
+  urCards: [{cardId: ObjectId, weight: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
-  const {
+  let {
     id,
-    uploaderId, uploaderName, uploaderAvatarUrl, date, name,
-    cost, desc, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    creator,
   } = CardPool;
+  if (creator) {
+    creator = exports.serializeUser(creator);
+  }
   return {
     id,
-    uploaderId, uploaderName, uploaderAvatarUrl, date, name, desc,
-    cost, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    creator,
   };
 };
 
 exports.createDefaultCardPool = function() {
   return {
-    uploaderId: null,
-    uploaderName: '',
-    uploaderAvatarUrl: '',
+    creatorId: '',
 
     name: '',
     desc: '',
