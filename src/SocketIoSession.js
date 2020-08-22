@@ -1500,14 +1500,20 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebCardList({rarity}) {
-    const sort = String('-date');
     debug('  onClWebCardList');
 
     let cards;
     if (rarity) {
-      cards = await Card.find({rarity}).sort(sort);
+      cards = await Card.aggregate([
+        {$match: {rarity: rarity}},
+        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
+        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+        {$sort: {date: -1}}]);
     } else {
-      cards = await Card.find({}).sort(sort);
+      cards = await Card.aggregate([
+        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
+        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+        {$sort: {date: -1}}]);
     }
 
     return cards.map((card) => serializeCard(card));
