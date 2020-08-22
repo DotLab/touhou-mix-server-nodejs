@@ -1441,7 +1441,7 @@ module.exports = class SocketIoSession {
     if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
     if (size !== buffer.length) throw codeError(2, 'tampering with api');
-    if (size > MB) throw codeError(2, 'too large');
+    if (size > 5 * MB) throw codeError(2, 'too large');
 
     let card = await Card.findById(id);
     if (!card) throw codeError(3, 'not found');
