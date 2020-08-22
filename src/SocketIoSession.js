@@ -1454,19 +1454,16 @@ module.exports = class SocketIoSession {
           portraitPath: paths.path,
         }}, {new: true});
         break;
-
       case 'cover':
         card = await Card.findByIdAndUpdate(id, {$set: {
           coverPath: paths.path,
         }}, {new: true});
         break;
-
       case 'background':
         card = await Card.findByIdAndUpdate(id, {$set: {
           backgroundPath: paths.path,
         }}, {new: true});
         break;
-
       case 'icon':
         card = await Card.findByIdAndUpdate(id, {$set: {
           iconPath: paths.path,
