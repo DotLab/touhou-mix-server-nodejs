@@ -1529,11 +1529,10 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    let cardPool = await CardPool.aggregate([
+    const cardPool = (await CardPool.aggregate([
       {$match: {_id: new ObjectId(id)}},
       {$lookup: {from: 'users', localField: 'creatorId', foreignField: '_id', as: 'creator'}},
-    ]);
-    cardPool = cardPool[0];
+    ]))[0];
 
     if (!cardPool) throw codeError(1, 'not found');
 
