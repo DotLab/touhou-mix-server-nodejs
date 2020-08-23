@@ -1529,110 +1529,34 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const cardPool = await CardPool.aggregate([
+    let cardPool = await CardPool.aggregate([
       {$match: {_id: new ObjectId(id)}},
       {$lookup: {from: 'users', localField: 'creatorId', foreignField: '_id', as: 'creator'}},
-      {$unwind: {path: '$nCards', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'cards', localField: 'nCards.cardId', foreignField: '_id', as: 'nCardDeck'}},
-      {$unwind: {path: '$nCardDeck', preserveNullAndEmptyArrays: true}},
-      {$group: {_id: '$_id',
-        date: {$first: '$date'},
-        name: {$first: '$name'},
-        desc: {$first: '$desc'},
-        cost: {$first: '$cost'},
-        nWeight: {$first: '$nWeight'},
-        rWeight: {$first: '$rWeight'},
-        srWeight: {$first: '$srWeight'},
-        ssrWeight: {$first: '$ssrWeight'},
-        urWeight: {$first: '$urWeight'},
-        rCards: {$first: '$rCards'},
-        srCards: {$first: '$srCards'},
-        ssrCards: {$first: '$ssrCards'},
-        urCards: {$first: '$urCards'},
-        nCards: {$push: {$mergeObjects: ['$nCards', '$nCardDeck']}},
-      }},
-      {$unwind: {path: '$rCards', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'cards', localField: 'rCards.cardId', foreignField: '_id', as: 'rCardDeck'}},
-      {$unwind: {path: '$rCardDeck', preserveNullAndEmptyArrays: true}},
-      {$group: {_id: '$_id',
-        date: {$first: '$date'},
-        name: {$first: '$name'},
-        desc: {$first: '$desc'},
-        cost: {$first: '$cost'},
-        nWeight: {$first: '$nWeight'},
-        rWeight: {$first: '$rWeight'},
-        srWeight: {$first: '$srWeight'},
-        ssrWeight: {$first: '$ssrWeight'},
-        urWeight: {$first: '$urWeight'},
-        nCards: {$first: '$nCards'},
-        srCards: {$first: '$srCards'},
-        ssrCards: {$first: '$ssrCards'},
-        urCards: {$first: '$urCards'},
-        rCards: {$push: {$mergeObjects: ['$rCards', '$rCardDeck']}},
-      }},
-      {$unwind: {path: '$srCards', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'cards', localField: 'srCards.cardId', foreignField: '_id', as: 'srCardDeck'}},
-      {$unwind: {path: '$srCardDeck', preserveNullAndEmptyArrays: true}},
-      {$group: {_id: '$_id',
-        date: {$first: '$date'},
-        name: {$first: '$name'},
-        desc: {$first: '$desc'},
-        cost: {$first: '$cost'},
-        nWeight: {$first: '$nWeight'},
-        rWeight: {$first: '$rWeight'},
-        srWeight: {$first: '$srWeight'},
-        ssrWeight: {$first: '$ssrWeight'},
-        urWeight: {$first: '$urWeight'},
-        nCards: {$first: '$nCards'},
-        rCards: {$first: '$rCards'},
-        ssrCards: {$first: '$ssrCards'},
-        urCards: {$first: '$urCards'},
-        srCards: {$push: {$mergeObjects: ['$srCards', '$srCardDeck']}},
-      }},
-      {$unwind: {path: '$ssrCards', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'cards', localField: 'ssrCards.cardId', foreignField: '_id', as: 'ssrCardDeck'}},
-      {$unwind: {path: '$ssrCardDeck', preserveNullAndEmptyArrays: true}},
-      {$group: {_id: '$_id',
-        date: {$first: '$date'},
-        name: {$first: '$name'},
-        desc: {$first: '$desc'},
-        cost: {$first: '$cost'},
-        nWeight: {$first: '$nWeight'},
-        rWeight: {$first: '$rWeight'},
-        srWeight: {$first: '$srWeight'},
-        ssrWeight: {$first: '$ssrWeight'},
-        urWeight: {$first: '$urWeight'},
-        nCards: {$first: '$nCards'},
-        rCards: {$first: '$rCards'},
-        srCards: {$first: '$srCards'},
-        urCards: {$first: '$urCards'},
-        ssrCards: {$push: {$mergeObjects: ['$ssrCards', '$ssrCardDeck']}},
-      }},
-
-      {$unwind: {path: '$urCards', preserveNullAndEmptyArrays: true}},
-      {$lookup: {from: 'cards', localField: 'urCards.cardId', foreignField: '_id', as: 'urCardDeck'}},
-      {$unwind: {path: '$urCardDeck', preserveNullAndEmptyArrays: true}},
-      {$group: {_id: '$_id',
-        date: {$first: '$date'},
-        name: {$first: '$name'},
-        desc: {$first: '$desc'},
-        cost: {$first: '$cost'},
-        nWeight: {$first: '$nWeight'},
-        rWeight: {$first: '$rWeight'},
-        srWeight: {$first: '$srWeight'},
-        ssrWeight: {$first: '$ssrWeight'},
-        urWeight: {$first: '$urWeight'},
-        nCards: {$first: '$nCards'},
-        rCards: {$first: '$rCards'},
-        srCards: {$first: '$srCards'},
-        ssrCards: {$first: '$ssrCards'},
-        urCards: {$push: {$mergeObjects: ['$urCards', '$urCardDeck']}},
-      }},
     ]);
+    cardPool = cardPool[0];
 
     if (!cardPool) throw codeError(1, 'not found');
 
-    return serializeCardPool(cardPool[0]);
+    const cardIds = [
+      ...cardPool.nCards,
+      ...cardPool.rCards,
+      ...cardPool.srCards,
+      ...cardPool.ssrCards,
+      ...cardPool.urCards,
+    ].map((x) => x.cardId);
+
+    let cards = await Card.find({_id: {$in: cardIds}}).lean();
+    cards = cards.reduce((acc, cur) => {
+      acc[cur._id.toString()] = cur; return acc;
+    }, {});
+
+    cardPool.nCards = cardPool.nCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.rCards = cardPool.rCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.srCards = cardPool.srCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.ssrCards = cardPool.ssrCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.urCards = cardPool.urCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+
+    return serializeCardPool(cardPool);
   }
 
   async onClWebCardPoolUpdate(update) {

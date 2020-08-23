@@ -880,8 +880,6 @@ exports.serializeCard = function(card) {
     uploader,
   } = card;
 
-  if (!_id) return null;
-
   if (uploader) {
     uploader = exports.serializeUser(uploader);
   }
