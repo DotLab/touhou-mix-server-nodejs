@@ -13,6 +13,7 @@ const {
 const {
   ROLE_MIDI_MOD,
   ROLE_MIDI_ADMIN,
+  ROLE_CARD_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -32,6 +33,8 @@ const {
   SessionToken, genSessionTokenHash,
   SessionRecord,
   ErrorReport, serializeErrorReport,
+  Card, createDefaultCard, serializeCard,
+  CardPool, createDefaultCardPool, serializeCardPool,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -256,6 +259,17 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_song_get', this.onClWebSongGet.bind(this));
     this.socket.on('cl_web_song_update', this.onClWebSongUpdate.bind(this));
     this.socket.on('cl_web_song_list', this.onClWebSongList.bind(this));
+
+    this.socket.on('ClWebCardCreate', createRpcHandler(this.onClWebCardCreate.bind(this)));
+    this.socket.on('ClWebCardGet', createRpcHandler(this.onClWebCardGet.bind(this)));
+    this.socket.on('ClWebCardUploadCover', createRpcHandler(this.onClWebCardUploadCover.bind(this)));
+    this.socket.on('ClWebCardUpdate', createRpcHandler(this.onClWebCardUpdate.bind(this)));
+    this.socket.on('ClWebCardList', createRpcHandler(this.onClWebCardList.bind(this)));
+
+    this.socket.on('ClWebCardPoolCreate', createRpcHandler(this.onClWebCardPoolCreate.bind(this)));
+    this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
+    this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
+    this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1394,6 +1408,189 @@ module.exports = class SocketIoSession {
       {$limit: MIDI_LIST_PAGE_LIMIT},
     ]);
     return errors.map((x) => serializeErrorReport(x, {user: this.user}));
+  }
+
+  async onClWebCardCreate() {
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const card = await Card.create({
+      ...createDefaultCard(),
+      uploaderId: this.user.id,
+      date: new Date(),
+    });
+    return {id: card.id};
+  }
+
+  async onClWebCardGet({id}) {
+    debug('  ClWebCardGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const card = await Card.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}}]);
+
+    if (!card) throw codeError(0, 'not found');
+
+    return serializeCard(card[0]);
+  }
+
+  async onClWebCardUploadCover({id, size, buffer, type}) {
+    debug('  onClWebCardUploadCover', id, size, buffer.length, type);
+
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+    if (size !== buffer.length) throw codeError(2, 'tampering with api');
+    if (size > 5 * MB) throw codeError(2, 'too large');
+
+    let card = await Card.findById(id);
+    if (!card) throw codeError(3, 'not found');
+    if (!card.uploaderId.equals(this.user.id)) throw codeError(4, ERROR_FORBIDDEN);
+
+    const paths = await this.uploadCover(buffer);
+    switch (type) {
+      case 'portrait':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          portraitPath: paths.path,
+        }}, {new: true});
+        break;
+      case 'cover':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          coverPath: paths.path,
+        }}, {new: true});
+        break;
+      case 'background':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          backgroundPath: paths.path,
+        }}, {new: true});
+        break;
+      case 'icon':
+        card = await Card.findByIdAndUpdate(id, {$set: {
+          iconPath: paths.path,
+        }}, {new: true});
+        break;
+    }
+
+    return serializeCard(card);
+  }
+
+  async onClWebCardUpdate(update) {
+    debug('  onClWebCardUpdate', update.id);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const {
+      id, name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
+    } = update;
+
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let card = await Card.findById(id);
+    if (!card) throw codeError(2, 'not found');
+    if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    update = filterUndefinedKeys({
+      name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
+    });
+
+    card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
+    return serializeCard(card);
+  }
+
+  async onClWebCardList({rarity}) {
+    debug('  onClWebCardList');
+
+    const cards = await Card.aggregate([
+      ...(rarity ? [{$match: {rarity}}] : []),
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
+      {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+      {$sort: {date: -1}}]);
+
+    return cards.map((card) => serializeCard(card));
+  }
+
+  async onClWebCardPoolCreate() {
+    debug('  onClWebCardPoolCreate');
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const cardPool = await CardPool.create({
+      ...createDefaultCardPool(),
+      creatorId: this.user.id,
+      date: new Date(),
+    });
+    return {id: cardPool.id};
+  }
+
+  async onClWebCardPoolGet({id}) {
+    debug('  ClWebCardPoolGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const cardPool = (await CardPool.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'creatorId', foreignField: '_id', as: 'creator'}},
+    ]))[0];
+
+    if (!cardPool) throw codeError(1, 'not found');
+
+    const cardIds = [
+      ...cardPool.nCards,
+      ...cardPool.rCards,
+      ...cardPool.srCards,
+      ...cardPool.ssrCards,
+      ...cardPool.urCards,
+    ].map((x) => x.cardId);
+
+    let cards = await Card.find({_id: {$in: cardIds}}).lean();
+    cards = cards.reduce((acc, cur) => {
+      acc[cur._id.toString()] = cur; return acc;
+    }, {});
+
+    cardPool.nCards = cardPool.nCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.rCards = cardPool.rCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.srCards = cardPool.srCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.ssrCards = cardPool.ssrCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.urCards = cardPool.urCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+
+    return serializeCardPool(cardPool);
+  }
+
+  async onClWebCardPoolUpdate(update) {
+    debug('  onClWebCardPoolUpdate', update.id);
+
+    const {
+      id,
+      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    } = update;
+
+    if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let cardPool = await CardPool.findById(id);
+    if (!cardPool) throw codeError(2, 'not found');
+    if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    update = filterUndefinedKeys({
+      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    });
+
+    cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
+    return serializeCardPool(cardPool);
+  }
+
+  async onClWebCardPoolList() {
+    const sort = String('-date');
+    debug('  onClWebCardPoolList');
+
+    const cardPools = await CardPool.find({})
+        .sort(sort);
+
+    return cardPools.map((cardPool) => serializeCardPool(cardPool));
   }
 
   async onClWebMidiCustomizedAlbumList() {

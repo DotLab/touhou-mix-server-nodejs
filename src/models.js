@@ -794,3 +794,176 @@ exports.serializeErrorReport = function(errorReport, context) {
   };
 };
 
+const CardSchema = new mongoose.Schema({
+  uploaderId: ObjectId,
+  date: Date,
+  name: String,
+  desc: String,
+
+  portraitSource: String,
+  portraitAuthorName: String,
+  coverSource: String,
+  coverAuthorName: String,
+  backgroundSource: String,
+  backgroundAuthorName: String,
+  iconSource: String,
+  iconAuthorName: String,
+
+  hash: String,
+  portraitPath: String,
+  coverPath: String,
+  backgroundPath: String,
+  iconPath: String,
+  // // main -------------------------------------------------------------------------
+  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
+  attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
+
+  // // parameters -------------------------------------------------------------------------
+  // spInit: {type: Number, required: true, min: 1, max: 4},
+  // spMax: {type: Number, required: true, min: 1, max: 4},
+
+  // haruInit: {type: Number, required: true, min: 1000, max: 2000},
+  // haruMax: {type: Number, required: true, min: 1500, max: 3000},
+
+  // reiInit: {type: Number, required: true, min: 200, max: 750},
+  // reiMax: {type: Number, required: true, min: 400, max: 1200},
+
+  // maInit: {type: Number, required: true, min: 200, max: 750},
+  // maMax: {type: Number, required: true, min: 400, max: 1200},
+});
+
+CardSchema.index({
+  name: 'text',
+  desc: 'text',
+  rarity: 'text',
+  attribute: 'text',
+}, {name: 'text_index'});
+
+/** @type {import('mongoose').Model<Object>} */
+const Card = mongoose.model('Card', CardSchema);
+Card.syncIndexes().catch((e) => debug(e));
+exports.Card = Card;
+
+exports.createDefaultCard = function() {
+  return {
+    // meta
+    rarity: 'n',
+    attribute: 'ma',
+    name: '',
+    desc: '',
+
+    portraitSource: '',
+    portraitAuthorName: '',
+    coverSource: '',
+    coverAuthorName: '',
+    backgroundSource: '',
+    backgroundAuthorName: '',
+    iconSource: '',
+    iconAuthorName: '',
+
+    // spInit: 1,
+    // spMax: 4,
+    // haruInit: 1000,
+    // haruMax: 3000,
+    // reiInit: 200,
+    // reiMax: 1200,
+    // maInit: 200,
+    // maMax: 1200,
+  };
+};
+
+exports.serializeCard = function(card) {
+  let {
+    _id,
+    name, desc, rarity, attribute, date,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
+    // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+    weight,
+    uploader,
+  } = card;
+
+  if (uploader) {
+    uploader = exports.serializeUser(uploader);
+  }
+  return {
+    id: _id,
+    name, desc, rarity, attribute, date,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
+    portraitUrl: portraitPath ? BUCKET_URL + portraitPath : null,
+    coverUrl: coverPath ? BUCKET_URL + coverPath : null,
+    backgroundUrl: backgroundPath ? BUCKET_URL + backgroundPath : null,
+    iconUrl: iconPath ? BUCKET_URL + iconPath : null,
+    // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+    uploader, weight,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
+  creatorId: ObjectId,
+
+  date: Date,
+  name: String,
+  desc: String,
+  cost: Number,
+
+  nWeight: Number,
+  rWeight: Number,
+  srWeight: Number,
+  ssrWeight: Number,
+  urWeight: Number,
+
+  nCards: [{cardId: ObjectId, weight: Number}],
+  rCards: [{cardId: ObjectId, weight: Number}],
+  srCards: [{cardId: ObjectId, weight: Number}],
+  ssrCards: [{cardId: ObjectId, weight: Number}],
+  urCards: [{cardId: ObjectId, weight: Number}],
+}));
+
+exports.serializeCardPool = function(CardPool) {
+  let {
+    _id,
+    date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
+    nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    creator,
+  } = CardPool;
+  if (creator) {
+    creator = exports.serializeUser(creator);
+  }
+  nCards = nCards ? nCards.map((x) => exports.serializeCard(x)) : nCards;
+  rCards = rCards ? rCards.map((x) => exports.serializeCard(x)) : rCards;
+  srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
+  ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
+  urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
+  return {
+    id: _id,
+    date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+    nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    creator,
+  };
+};
+
+exports.createDefaultCardPool = function() {
+  return {
+    creatorId: '',
+
+    name: '',
+    desc: '',
+    cost: 0,
+    nWeight: 1,
+    rWeight: 1,
+    srWeight: 1,
+    ssrWeight: 1,
+    urWeight: 1,
+
+    nCards: [],
+    rCards: [],
+    srCards: [],
+    ssrCards: [],
+    urCards: [],
+  };
+};
