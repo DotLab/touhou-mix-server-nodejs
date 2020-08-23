@@ -815,7 +815,7 @@ const CardSchema = new mongoose.Schema({
   backgroundPath: String,
   iconPath: String,
   // // main -------------------------------------------------------------------------
-  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
+  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ssr', 'ur']},
   attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
 
   // // parameters -------------------------------------------------------------------------
