@@ -876,8 +876,11 @@ exports.serializeCard = function(card) {
     portraitSource, portraitAuthorName, coverSource, coverAuthorName,
     backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+    weight,
     uploader,
   } = card;
+
+  if (!_id) return null;
 
   if (uploader) {
     uploader = exports.serializeUser(uploader);
@@ -893,7 +896,7 @@ exports.serializeCard = function(card) {
     backgroundUrl: backgroundPath ? BUCKET_URL + backgroundPath : null,
     iconUrl: iconPath ? BUCKET_URL + iconPath : null,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
-    uploader,
+    uploader, weight,
   };
 };
 
@@ -921,7 +924,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
 
 exports.serializeCardPool = function(CardPool) {
   let {
-    id,
+    _id,
     date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator,
@@ -929,8 +932,13 @@ exports.serializeCardPool = function(CardPool) {
   if (creator) {
     creator = exports.serializeUser(creator);
   }
+  nCards = nCards ? nCards.map((x) => exports.serializeCard(x)) : nCards;
+  rCards = rCards ? rCards.map((x) => exports.serializeCard(x)) : rCards;
+  srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
+  ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
+  urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
   return {
-    id,
+    id: _id,
     date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator,
