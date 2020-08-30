@@ -38,6 +38,8 @@ exports.User = mongoose.model('User', new mongoose.Schema({
   onlineTime: Number,
   performance: Number,
   ranking: Number,
+  gold: Number,
+  rewardNewDayLogin: Boolean,
 
   sCount: Number,
   aCount: Number,
@@ -53,7 +55,7 @@ exports.serializeUser = function(user) {
     name, joinedDate, seenDate, bio, avatarUrl, roles,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
-    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
@@ -61,7 +63,7 @@ exports.serializeUser = function(user) {
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
-    performance, ranking, sCount, aCount, bCount, cCount, dCount, fCount,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
     passCount: trialCount - fCount, failCount: fCount,
   };
 };
@@ -88,6 +90,8 @@ exports.createDefaultUser = function() {
     playTime: 0,
     performance: 0,
     ranking: 0,
+    gold: 0,
+    rewardNewDayLogin: true,
     sCount: 0,
     aCount: 0,
     bCount: 0,
@@ -795,8 +799,15 @@ const CardSchema = new mongoose.Schema({
   date: Date,
   name: String,
   desc: String,
-  picSource: String,
-  picAuthorName: String,
+
+  portraitSource: String,
+  portraitAuthorName: String,
+  coverSource: String,
+  coverAuthorName: String,
+  backgroundSource: String,
+  backgroundAuthorName: String,
+  iconSource: String,
+  iconAuthorName: String,
 
   hash: String,
   portraitPath: String,
@@ -804,7 +815,7 @@ const CardSchema = new mongoose.Schema({
   backgroundPath: String,
   iconPath: String,
   // // main -------------------------------------------------------------------------
-  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ur']},
+  rarity: {type: String, required: true, enum: ['n', 'r', 'sr', 'ssr', 'ur']},
   attribute: {type: String, required: true, enum: ['haru', 'rei', 'ma']},
 
   // // parameters -------------------------------------------------------------------------
@@ -825,7 +836,7 @@ CardSchema.index({
   name: 'text',
   desc: 'text',
   rarity: 'text',
-  // attribute: 'text',
+  attribute: 'text',
 }, {name: 'text_index'});
 
 /** @type {import('mongoose').Model<Object>} */
@@ -840,8 +851,15 @@ exports.createDefaultCard = function() {
     attribute: 'ma',
     name: '',
     desc: '',
-    picSource: '',
-    picAuthorName: '',
+
+    portraitSource: '',
+    portraitAuthorName: '',
+    coverSource: '',
+    coverAuthorName: '',
+    backgroundSource: '',
+    backgroundAuthorName: '',
+    iconSource: '',
+    iconAuthorName: '',
 
     // spInit: 1,
     // spMax: 4,
@@ -858,8 +876,11 @@ exports.serializeCard = function(card) {
   let {
     _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
+    weight,
     uploader,
   } = card;
 
@@ -869,21 +890,21 @@ exports.serializeCard = function(card) {
   return {
     id: _id,
     name, desc, rarity, attribute, date,
-    portraitPath, coverPath, backgroundPath, iconPath, picSource, picAuthorName,
+    portraitPath, coverPath, backgroundPath, iconPath,
+    portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+    backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     portraitUrl: portraitPath ? BUCKET_URL + portraitPath : null,
     coverUrl: coverPath ? BUCKET_URL + coverPath : null,
     backgroundUrl: backgroundPath ? BUCKET_URL + backgroundPath : null,
     iconUrl: iconPath ? BUCKET_URL + iconPath : null,
     // spInit, spMax, haruInit, haruMax, reiInit, reiMax, maInit, maMax,
-    uploader,
+    uploader, weight,
   };
 };
 
 /** @type {import('mongoose').Model<Object>} */
 exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
-  uploaderId: ObjectId,
-  uploaderName: String,
-  uploaderAvatarUrl: String,
+  creatorId: ObjectId,
 
   date: Date,
   name: String,
@@ -897,37 +918,39 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   ssrWeight: Number,
   urWeight: Number,
 
-  nCards: Array,
-  rCards: Array,
-  srCards: Array,
-  ssrCards: Array,
-  urCards: Array,
+  nCards: [{cardId: ObjectId, weight: Number}],
+  rCards: [{cardId: ObjectId, weight: Number}],
+  srCards: [{cardId: ObjectId, weight: Number}],
+  ssrCards: [{cardId: ObjectId, weight: Number}],
+  urCards: [{cardId: ObjectId, weight: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
-  const {
-    id,
-    uploaderId, uploaderName, uploaderAvatarUrl, date, name,
-    cost, desc, nCards, rCards, srCards, ssrCards, urCards,
+  let {
+    _id,
+    date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    coverPath,
+    creator,
   } = CardPool;
-
-  const coverUrl = BUCKET_URL + coverPath;
+  if (creator) {
+    creator = exports.serializeUser(creator);
+  }
+  nCards = nCards ? nCards.map((x) => exports.serializeCard(x)) : nCards;
+  rCards = rCards ? rCards.map((x) => exports.serializeCard(x)) : rCards;
+  srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
+  ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
+  urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
   return {
-    id,
-    uploaderId, uploaderName, uploaderAvatarUrl, date, name, desc,
-    cost, nCards, rCards, srCards, ssrCards, urCards,
+    id: _id,
+    date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    coverUrl,
+    creator,
   };
 };
 
 exports.createDefaultCardPool = function() {
   return {
-    uploaderId: null,
-    uploaderName: '',
-    uploaderAvatarUrl: '',
+    creatorId: '',
 
     name: '',
     desc: '',
