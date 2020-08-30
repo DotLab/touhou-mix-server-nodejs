@@ -4,8 +4,7 @@ const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
 const {ROLE_MIDI_MOD, ROLE_SITE_OWNER, checkUserRole} = require('./services/RoleService');
 
-// const BUCKET_URL = 'https://storage.thmix.org';
-const BUCKET_URL = 'https://storage.cloud.google.com/scarletea';
+const BUCKET_URL = 'https://storage.thmix.org';
 
 exports.connectDatabase = async function(database) {
   const mongoose = require('mongoose');
@@ -890,6 +889,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   name: String,
   desc: String,
   cost: Number,
+  coverPath: String,
 
   nWeight: Number,
   rWeight: Number,
@@ -910,12 +910,16 @@ exports.serializeCardPool = function(CardPool) {
     uploaderId, uploaderName, uploaderAvatarUrl, date, name,
     cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    coverPath,
   } = CardPool;
+
+  const coverUrl = BUCKET_URL + coverPath;
   return {
     id,
     uploaderId, uploaderName, uploaderAvatarUrl, date, name, desc,
     cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
+    coverUrl,
   };
 };
 

@@ -13,6 +13,7 @@ const {
 const {
   ROLE_MIDI_MOD,
   ROLE_MIDI_ADMIN,
+  ROLE_CARD_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -34,7 +35,6 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
-  UserHasCard,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -270,9 +270,6 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
-
-    this.socket.on('ClWebCardDrawOnce', createRpcHandler(this.onClWebCardDrawOnce.bind(this)));
-    this.socket.on('ClWebCardDrawEleven', createRpcHandler(this.onClWebCardDrawEleven.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1414,7 +1411,7 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebCardCreate() {
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const card = await Card.create({
       ...createDefaultCard(),
@@ -1429,19 +1426,22 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const card = await Card.findById(id);
+    const card = await Card.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}}]);
+
     if (!card) throw codeError(0, 'not found');
 
-    return serializeCard(card);
+    return serializeCard(card[0]);
   }
 
   async onClWebCardUploadCover({id, size, buffer, type}) {
     debug('  onClWebCardUploadCover', id, size, buffer.length, type);
 
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
     if (size !== buffer.length) throw codeError(2, 'tampering with api');
-    if (size > MB) throw codeError(2, 'too large');
+    if (size > 5 * MB) throw codeError(2, 'too large');
 
     let card = await Card.findById(id);
     if (!card) throw codeError(3, 'not found');
@@ -1451,25 +1451,22 @@ module.exports = class SocketIoSession {
     switch (type) {
       case 'portrait':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          portraitPath: paths.path,
+          portraitPath: paths.coverPath,
         }}, {new: true});
         break;
-
       case 'cover':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          coverPath: paths.path,
+          coverPath: paths.coverPath,
         }}, {new: true});
         break;
-
       case 'background':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          backgroundPath: paths.path,
+          backgroundPath: paths.coverPath,
         }}, {new: true});
         break;
-
       case 'icon':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          iconPath: paths.path,
+          iconPath: paths.coverPath,
         }}, {new: true});
         break;
     }
@@ -1479,12 +1476,14 @@ module.exports = class SocketIoSession {
 
   async onClWebCardUpdate(update) {
     debug('  onClWebCardUpdate', update.id);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const {
-      id, name, desc, rarity, attribute, picSource, picAuthorName,
+      id, name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     } = update;
 
-    if (!this.user) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
 
     let card = await Card.findById(id);
@@ -1492,7 +1491,9 @@ module.exports = class SocketIoSession {
     if (!card.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     update = filterUndefinedKeys({
-      name, desc, rarity, attribute, picSource, picAuthorName,
+      name, desc, rarity, attribute,
+      portraitSource, portraitAuthorName, coverSource, coverAuthorName,
+      backgroundSource, backgroundAuthorName, iconSource, iconAuthorName,
     });
 
     card = await Card.findByIdAndUpdate(id, {$set: update}, {new: true});
@@ -1502,32 +1503,22 @@ module.exports = class SocketIoSession {
   async onClWebCardList({rarity}) {
     debug('  onClWebCardList');
 
-    let cards;
-    if (rarity) {
-      cards = await Card.aggregate([
-        {$match: {rarity: rarity}},
-        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
-        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
-        {$sort: {date: -1}}]);
-    } else {
-      cards = await Card.aggregate([
-        {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
-        {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
-        {$sort: {date: -1}}]);
-    }
+    const cards = await Card.aggregate([
+      ...(rarity ? [{$match: {rarity}}] : []),
+      {$lookup: {from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader'}},
+      {$unwind: {path: '$uploader', preserveNullAndEmptyArrays: true}},
+      {$sort: {date: -1}}]);
 
     return cards.map((card) => serializeCard(card));
   }
 
   async onClWebCardPoolCreate() {
     debug('  onClWebCardPoolCreate');
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const cardPool = await CardPool.create({
       ...createDefaultCardPool(),
-      uploaderId: this.user.id,
-      uploaderName: this.user.name,
-      uploaderAvatarUrl: this.user.avatarUrl,
+      creatorId: this.user.id,
       date: new Date(),
     });
     return {id: cardPool.id};
@@ -1538,8 +1529,31 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const cardPool = await CardPool.findById(id);
-    if (!cardPool) throw codeError(0, 'not found');
+    const cardPool = (await CardPool.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'users', localField: 'creatorId', foreignField: '_id', as: 'creator'}},
+    ]))[0];
+
+    if (!cardPool) throw codeError(1, 'not found');
+
+    const cardIds = [
+      ...cardPool.nCards,
+      ...cardPool.rCards,
+      ...cardPool.srCards,
+      ...cardPool.ssrCards,
+      ...cardPool.urCards,
+    ].map((x) => x.cardId);
+
+    let cards = await Card.find({_id: {$in: cardIds}}).lean();
+    cards = cards.reduce((acc, cur) => {
+      acc[cur._id.toString()] = cur; return acc;
+    }, {});
+
+    cardPool.nCards = cardPool.nCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.rCards = cardPool.rCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.srCards = cardPool.srCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.ssrCards = cardPool.ssrCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.urCards = cardPool.urCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
 
     return serializeCardPool(cardPool);
   }
@@ -1553,47 +1567,31 @@ module.exports = class SocketIoSession {
       nWeight, rWeight, srWeight, ssrWeight, urWeight,
     } = update;
 
-    if (!this.user || !this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
 
     let cardPool = await CardPool.findById(id);
     if (!cardPool) throw codeError(2, 'not found');
-    if (!cardPool.uploaderId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+    if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
+
+    let coverPath = '';
+    if (urCards) {
+      coverPath = urCards[0].coverPath;
+    } else if (ssrCards) {
+      coverPath = ssrCards[0].coverPath;
+    } else if (srCards) {
+      coverPath = srCards[0].coverPath;
+    } else if (rCards) {
+      coverPath = rCards[0].coverPath;
+    } else if (nCards) {
+      coverPath = nCards[0].coverPath;
+    }
 
     update = filterUndefinedKeys({
       name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight, coverPath,
     });
 
-    if (nCards) {
-      for (let i = 0; i < nCards; i++) {
-        if (nCards[i].weight > 100) throw codeError(4, 'weight too large');
-      }
-    }
-
-    if (rCards) {
-      for (let i = 0; i < rCards; i++) {
-        if (rCards[i].weight > 100) throw codeError(5, 'weight too large');
-      }
-    }
-
-    if (srCards) {
-      for (let i = 0; i < srCards; i++) {
-        if (srCards[i].weight > 100) throw codeError(6, 'weight too large');
-      }
-    }
-
-    if (ssrCards) {
-      for (let i = 0; i < ssrCards; i++) {
-        if (ssrCards[i].weight > 100) throw codeError(7, 'weight too large');
-      }
-    }
-
-    if (urCards) {
-      for (let i = 0; i < urCards; i++) {
-        if (urCards[i].weight > 100) throw codeError(8, 'weight too large');
-      }
-    }
     cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
     return serializeCardPool(cardPool);
   }
@@ -1618,95 +1616,5 @@ module.exports = class SocketIoSession {
       {$addFields: {name: '$_id'}},
     ]);
     return res;
-  }
-
-  async onClWebCardDrawOnce({id}) {
-    debug('  onClWebCardDrawOnce', id);
-    const cardPool = await CardPool.findById(id);
-    if (!cardPool) throw codeError(0, 'not found');
-
-    if (!this.user.gold || this.user.gold < cardPool.cost) throw codeError(1, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost}});
-
-    const nRate = (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const rRate = (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const srRate = (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const ssrRate = (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    let ran = Math.random() * 100;
-
-    let deck = [];
-    if (ran <= nRate) {
-      deck = cardPool.nCards;
-    } else if (nRate < ran && ran <= nRate + rRate) {
-      deck = cardPool.rCards;
-    } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
-      deck = cardPool.srCards;
-    } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
-      deck = cardPool.ssrCards;
-    } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
-      deck = cardPool.urCards;
-    }
-
-    const arr = [];
-    deck.forEach((x) => {
-      for (let i = 0; i < parseInt(x.weight); i++) {
-        arr.push(x.id);
-      }
-    });
-    ran = Math.floor(Math.random() * arr.length);
-    if (ran === arr.length) ran = arr.length - 1;
-    const card = await Card.findById(new ObjectId(arr[ran]));
-    if (!card) throw codeError(2, 'not found');
-
-    await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
-    return serializeCard(card);
-  }
-
-  async onClWebCardDrawEleven({id}) {
-    debug('  onClWebCardDrawEleven', id);
-
-    const cardPool = await CardPool.findById(id);
-    if (!cardPool) throw codeError(0, 'not found');
-    if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
-
-    if (!this.user.gold || this.user.gold < cardPool.cost * 10) throw codeError(2, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost * 10}});
-
-    const nRate = (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const rRate = (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const srRate = (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const ssrRate = (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-
-    const res = [];
-    for (let i = 0; i < 11; i++) {
-      let ran = Math.random() * 100;
-      let deck = [];
-      if (ran <= nRate) {
-        deck = cardPool.nCards;
-      } else if (nRate < ran && ran <= nRate + rRate) {
-        deck = cardPool.rCards;
-      } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
-        deck = cardPool.srCards;
-      } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
-        deck = cardPool.ssrCards;
-      } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
-        deck = cardPool.urCards;
-      }
-
-      const arr = [];
-      deck.forEach((x) => {
-        for (let i = 0; i < parseInt(x.weight); i++) {
-          arr.push(x.id);
-        }
-      });
-      ran = Math.floor(Math.random() * arr.length);
-      if (ran === arr.length) ran = arr.length - 1;
-      const card = await Card.findById(new ObjectId(arr[ran]));
-      if (!card) throw codeError(3, 'not found');
-      await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
-      res.push(card);
-    }
-
-    return res.map((x) => serializeCard(x));
   }
 };
