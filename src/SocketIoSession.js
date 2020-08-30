@@ -35,6 +35,7 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
+  UserHasCard,
 } = require('./models');
 const {NAME_ARTIFACT} = require('./TranslationService');
 
@@ -270,6 +271,9 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
+
+    this.socket.on('ClWebCardDrawOnce', createRpcHandler(this.onClWebCardDrawOnce.bind(this)));
+    this.socket.on('ClWebCardDrawEleven', createRpcHandler(this.onClWebCardDrawEleven.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1621,5 +1625,97 @@ module.exports = class SocketIoSession {
       {$addFields: {name: '$_id'}},
     ]);
     return res;
+  }
+
+  async onClWebCardDrawOnce({id}) {
+    debug('  onClWebCardDrawOnce', id);
+    const cardPool = await CardPool.findById(id);
+    if (!cardPool) throw codeError(0, 'not found');
+
+    if (!this.user.gold || this.user.gold < cardPool.cost) throw codeError(1, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost}});
+
+    const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const srRate = cardPool.srCards.length === 0 ? 0 : (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    let ran = Math.random() * 100;
+
+    let deck = [];
+    if (ran <= nRate) {
+      deck = cardPool.nCards;
+    } else if (nRate < ran && ran <= nRate + rRate) {
+      deck = cardPool.rCards;
+    } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
+      deck = cardPool.srCards;
+    } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
+      deck = cardPool.ssrCards;
+    } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
+      deck = cardPool.urCards;
+    }
+
+    const arr = [];
+    deck.forEach((x) => {
+      for (let i = 0; i < parseInt(x.weight); i++) {
+        arr.push(x.cardId);
+      }
+    });
+
+    ran = Math.floor(Math.random() * arr.length);
+    if (ran === arr.length) ran = arr.length - 1;
+    const card = await Card.findById(new ObjectId(arr[ran]));
+    if (!card) throw codeError(2, 'not found');
+
+    await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
+    return serializeCard(card);
+  }
+
+  async onClWebCardDrawEleven({id}) {
+    debug('  onClWebCardDrawEleven', id);
+
+    const cardPool = await CardPool.findById(id);
+    if (!cardPool) throw codeError(0, 'not found');
+    if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
+
+    if (!this.user.gold || this.user.gold < cardPool.cost * 10) throw codeError(2, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost * 10}});
+
+    const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const srRate = cardPool.srCards.length === 0 ? 0 : (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+
+    const res = [];
+    for (let i = 0; i < 11; i++) {
+      let ran = Math.random() * 100;
+      let deck = [];
+      if (ran <= nRate) {
+        deck = cardPool.nCards;
+      } else if (nRate < ran && ran <= nRate + rRate) {
+        deck = cardPool.rCards;
+      } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
+        deck = cardPool.srCards;
+      } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
+        deck = cardPool.ssrCards;
+      } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
+        deck = cardPool.urCards;
+      }
+
+      const arr = [];
+      deck.forEach((x) => {
+        for (let i = 0; i < parseInt(x.weight); i++) {
+          arr.push(x.cardId);
+        }
+      });
+
+      ran = Math.floor(Math.random() * arr.length);
+      if (ran === arr.length) ran = arr.length - 1;
+      const card = await Card.findById(new ObjectId(arr[ran]));
+      if (!card) throw codeError(3, 'not found');
+      await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
+      res.push(card);
+    }
+
+    return res.map((x) => serializeCard(x));
   }
 };
