@@ -930,7 +930,7 @@ exports.serializeCardPool = function(CardPool) {
     _id,
     date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    creator, coverPath,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
@@ -940,11 +940,14 @@ exports.serializeCardPool = function(CardPool) {
   srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
   ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
   urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
+
+  const coverUrl = BUCKET_URL + coverPath;
+
   return {
     id: _id,
     date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    creator, coverUrl,
   };
 };
 
@@ -960,6 +963,7 @@ exports.createDefaultCardPool = function() {
     srWeight: 1,
     ssrWeight: 1,
     urWeight: 1,
+    coverPath: '',
 
     nCards: [],
     rCards: [],

@@ -1575,16 +1575,21 @@ module.exports = class SocketIoSession {
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     let coverPath = '';
-    if (urCards) {
-      coverPath = urCards[0].coverPath;
-    } else if (ssrCards) {
-      coverPath = ssrCards[0].coverPath;
-    } else if (srCards) {
-      coverPath = srCards[0].coverPath;
-    } else if (rCards) {
-      coverPath = rCards[0].coverPath;
-    } else if (nCards) {
-      coverPath = nCards[0].coverPath;
+    if (urCards && urCards.length != 0) {
+      const coverCard = await Card.findById(urCards[0].cardId);
+      coverPath = coverCard.coverPath;
+    } else if (ssrCards && ssrCards.length != 0) {
+      const coverCard = await Card.findById(ssrCards[0].cardId);
+      coverPath = coverCard.coverPath;
+    } else if (srCards && srCards.length != 0) {
+      const coverCard = await Card.findById(srCards[0].cardId);
+      coverPath = coverCard.coverPath;
+    } else if (rCards && rCards.length != 0) {
+      const coverCard = await Card.findById(rCards[0].cardId);
+      coverPath = coverCard.coverPath;
+    } else if (nCards && nCards.length != 0) {
+      const coverCard = await Card.findById(nCards[0].cardId);
+      coverPath = coverCard.coverPath;
     }
 
     update = filterUndefinedKeys({
