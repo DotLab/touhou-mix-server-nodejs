@@ -28,6 +28,8 @@ exports.User = mongoose.model('User', new mongoose.Schema({
   avatarUrl: String,
   avatarPath: String,
   roles: Array,
+  isAnon: Boolean,
+  deviceId: String,
   // cached
   trialCount: Number,
   score: Number,
@@ -52,14 +54,14 @@ exports.User = mongoose.model('User', new mongoose.Schema({
 exports.serializeUser = function(user) {
   const {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl, roles,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl, roles,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
@@ -81,6 +83,8 @@ exports.createDefaultUser = function() {
     avatarUrl: '',
     avatarPath: '',
     roles: [],
+    isAnon: false,
+    deviceId: '',
     // cached
     trialCount: 0,
     score: 0,

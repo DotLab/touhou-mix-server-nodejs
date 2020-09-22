@@ -4,7 +4,7 @@ const {
   UI_APP,
 } = require('./TranslationService');
 const {
-  User, serializeUser,
+  User, serializeUser, createDefaultUser,
   Midi, serializeMidi,
   Trial, getGradeFromAccuracy, getGradeLevelFromAccuracy,
   Build, serializeBuild,
@@ -37,6 +37,12 @@ function calcPasswordHash(password, salt) {
   const hasher = crypto.createHash(PASSWORD_HASHER);
   hasher.update(password);
   hasher.update(salt);
+  return hasher.digest('base64');
+}
+
+function calcHash(buffer) {
+  const hasher = crypto.createHash(PASSWORD_HASHER);
+  hasher.update(buffer);
   return hasher.digest('base64');
 }
 
@@ -112,6 +118,7 @@ module.exports = class WebSocketSession {
       const {id, command, args} = JSON.parse(data);
 
       switch (command) {
+        case 'ClAppHandshake': this.wrapRpcHandler(id, args, this.onClAppHandshake.bind(this)); break;
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
         case 'ClAppUserLogin': this.onClAppUserLogin(id, args); break;
         case 'ClAppMidiGet': this.wrapRpcHandler(id, args, this.onClAppMidiGet.bind(this)); break;
@@ -186,6 +193,28 @@ module.exports = class WebSocketSession {
   returnError(id, message) {
     debug('    error', id, message);
     this.rpc('SvAppHandleRpcResponse', {id, error: message});
+  }
+
+  async onClAppHandshake({deviceId}) {
+    debug('    onClAppHandshake', deviceId);
+    let user = await User.findOne({isAnon: true, deviceId});
+    if (!user) {
+      const now = new Date();
+      user = await User.create({
+        ...createDefaultUser(),
+
+        isAnon: true,
+        deviceId,
+
+        name: calcHash(deviceId).substr(0, 7),
+        joinedDate: now, seenDate: now,
+
+        bio: 'An anonymous user.',
+      });
+    }
+    this.user = user;
+    this.user = await this.updateUser({seenDate: new Date(), rewardNewDayLogin: false});
+    return null;
   }
 
   async onClAppUserLogin(id, {name, password}) {
