@@ -112,7 +112,7 @@ module.exports = class WebSocketSession {
       const {id, command, args} = JSON.parse(data);
 
       switch (command) {
-        case 'ClAppHandshake': this.onClAppHandshake(id, args); break;
+        case 'ClAppHandshake': this.wrapRpcHandler(id, args, this.onClAppHandshake.bind(this)); break;
         case 'ClAppHandleRpcResponse': this.handleRpcResponse(id, args); break;
         case 'ClAppUserLogin': this.onClAppUserLogin(id, args); break;
         case 'ClAppMidiGet': this.wrapRpcHandler(id, args, this.onClAppMidiGet.bind(this)); break;
@@ -190,14 +190,14 @@ module.exports = class WebSocketSession {
   }
 
   async onClAppHandshake(id, {deviceId}) {
-    let user = await User.findOne({deviceId, isAnon: false});
+    let user = await User.findOne({deviceId, isAnon: true});
     if (user) {
       this.user = user;
       this.user = await this.updateUser({seenDate: new Date(), rewardNewDayLogin: false});
     } else {
       user = await User.create({isAnon: true, deviceId, seenDate: new Date()});
     }
-    return this.returnSuccess(id);
+    return id;
   }
 
   async onClAppUserLogin(id, {name, password}) {
