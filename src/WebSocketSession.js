@@ -406,14 +406,14 @@ module.exports = class WebSocketSession {
 
     const trials = await Trial.aggregate([
       {$match: {midiId: midi._id, version: TRIAL_SCORING_VERSION}},
-      {$sort: {performance: -1, score: -1}},
+      {$sort: {withdrew: 1, performance: -1, score: -1}},
       {$group: {_id: '$userId', first: {$first: '$$ROOT'}}},
       {$replaceWith: '$first'},
       {$lookup: {from: 'users', localField: 'userId', foreignField: '_id', as: 'user'}},
       {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
       {$addFields: {userName: '$user.name', userAvatarUrl: '$user.avatarUrl'}},
       {$project: {user: 0}},
-      {$sort: {performance: -1, score: -1}}]).exec();
+      {$sort: {withdrew: 1, performance: -1, score: -1}}]).exec();
 
     this.returnSuccess(id, trials);
   }
