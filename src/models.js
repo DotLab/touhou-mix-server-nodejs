@@ -914,6 +914,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   name: String,
   desc: String,
   cost: Number,
+  coverPath: String,
 
   nWeight: Number,
   rWeight: Number,
@@ -926,6 +927,8 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   srCards: [{cardId: ObjectId, weight: Number}],
   ssrCards: [{cardId: ObjectId, weight: Number}],
   urCards: [{cardId: ObjectId, weight: Number}],
+
+  packs: [{name: String, cardNum: Number, cost: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
@@ -933,7 +936,7 @@ exports.serializeCardPool = function(CardPool) {
     _id,
     date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    creator, coverPath, packs,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
@@ -943,11 +946,14 @@ exports.serializeCardPool = function(CardPool) {
   srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
   ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
   urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
+
+  const coverUrl = BUCKET_URL + coverPath;
+
   return {
     id: _id,
     date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    creator, coverUrl, packs,
   };
 };
 
@@ -963,11 +969,20 @@ exports.createDefaultCardPool = function() {
     srWeight: 1,
     ssrWeight: 1,
     urWeight: 1,
+    coverPath: '',
 
     nCards: [],
     rCards: [],
     srCards: [],
     ssrCards: [],
     urCards: [],
+    packs: [],
   };
 };
+
+/** @type {import('mongoose').Model<Object>} */
+exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
+  userId: ObjectId,
+  cardId: ObjectId,
+  date: Date,
+}));

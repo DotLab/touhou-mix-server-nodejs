@@ -1564,7 +1564,7 @@ module.exports = class SocketIoSession {
     const {
       id,
       name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
     } = update;
 
     if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
@@ -1576,7 +1576,7 @@ module.exports = class SocketIoSession {
 
     update = filterUndefinedKeys({
       name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
     });
 
     cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
