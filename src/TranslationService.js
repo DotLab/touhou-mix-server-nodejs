@@ -19,9 +19,13 @@ class TranslationService {
     const doc = await Translation.findOne({src, lang, namespace, active: true}).exec();
     if (doc) return doc.text;
 
-    const [text] = await this.translateContext.translate(src, lang);
-    await Translation.create({src, lang, namespace, text, active: true});
-    return text;
+    try {
+      const [text] = await this.translateContext.translate(src, lang);
+      await Translation.create({src, lang, namespace, text, active: true});
+      return text;
+    } catch (e) {
+      return src;
+    }
   }
 
   async update(user, src, lang, namespace, text) {

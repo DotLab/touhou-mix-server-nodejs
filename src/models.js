@@ -28,6 +28,8 @@ exports.User = mongoose.model('User', new mongoose.Schema({
   avatarUrl: String,
   avatarPath: String,
   roles: Array,
+  isAnon: Boolean,
+  deviceId: String,
   // cached
   trialCount: Number,
   score: Number,
@@ -52,14 +54,14 @@ exports.User = mongoose.model('User', new mongoose.Schema({
 exports.serializeUser = function(user) {
   const {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl, roles,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
-    name, joinedDate, seenDate, bio, avatarUrl, roles,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
@@ -81,6 +83,8 @@ exports.createDefaultUser = function() {
     avatarUrl: '',
     avatarPath: '',
     roles: [],
+    isAnon: false,
+    deviceId: '',
     // cached
     trialCount: 0,
     score: 0,
@@ -923,6 +927,8 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   srCards: [{cardId: ObjectId, weight: Number}],
   ssrCards: [{cardId: ObjectId, weight: Number}],
   urCards: [{cardId: ObjectId, weight: Number}],
+
+  packs: [{name: String, cardNum: Number, cost: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
@@ -930,7 +936,7 @@ exports.serializeCardPool = function(CardPool) {
     _id,
     date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator, coverPath,
+    creator, coverPath, packs,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
@@ -947,7 +953,7 @@ exports.serializeCardPool = function(CardPool) {
     id: _id,
     date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator, coverUrl,
+    creator, coverUrl, packs,
   };
 };
 
@@ -970,6 +976,7 @@ exports.createDefaultCardPool = function() {
     srCards: [],
     ssrCards: [],
     urCards: [],
+    packs: [],
   };
 };
 
