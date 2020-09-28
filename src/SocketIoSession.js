@@ -105,8 +105,8 @@ function createRpcHandler(resolver) {
   };
 }
 
-const COVER_HEIGHT = 250;
-const COVER_WIDTH = 900;
+const COVER_HEIGHT = 700;
+const COVER_WIDTH = 500;
 
 module.exports = class SocketIoSession {
   /**
@@ -159,7 +159,7 @@ module.exports = class SocketIoSession {
     // generate
     await Promise.all([
       image.toFile(localPath),
-      meta.width > COVER_WIDTH && meta.height > COVER_HEIGHT ?
+      meta.width > COVER_WIDTH || meta.height > COVER_HEIGHT ?
           // crop
           image.resize(COVER_WIDTH, COVER_HEIGHT).jpeg({quality: 80}).toFile(coverLocalPath) :
           image.jpeg({quality: 80}).toFile(coverLocalPath),
