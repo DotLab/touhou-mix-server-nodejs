@@ -1563,7 +1563,7 @@ module.exports = class SocketIoSession {
 
     const {
       id,
-      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+      name, desc, nCards, rCards, srCards, ssrCards, urCards,
       nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
     } = update;
 
@@ -1574,9 +1574,26 @@ module.exports = class SocketIoSession {
     if (!cardPool) throw codeError(2, 'not found');
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
+    let cardId = null;
+    let coverPath;
+
+    if (urCards) {
+      cardId = urCards[0].cardId;
+    } else if (ssrCards) {
+      cardId = ssrCards[0].cardId;
+    } else if (srCards) {
+      cardId = srCards[0].cardId;
+    } else if (rCards) {
+      cardId = rCards[0].cardId;
+    }
+    if (cardId) {
+      const card = await this.onClWebCardGet({id: cardId});
+      coverPath = card.coverPath;
+    }
+
     update = filterUndefinedKeys({
-      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
+      name, desc, nCards, rCards, srCards, ssrCards, urCards,
+      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs, coverPath,
     });
 
     cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
