@@ -272,6 +272,7 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
 
+    this.socket.on('ClWebCostGold', createRpcHandler(this.onClWebCostGold.bind(this)));
     this.socket.on('ClWebCardDrawOnce', createRpcHandler(this.onClWebCardDrawOnce.bind(this)));
     this.socket.on('ClWebCardDrawEleven', createRpcHandler(this.onClWebCardDrawEleven.bind(this)));
 
@@ -1627,13 +1628,16 @@ module.exports = class SocketIoSession {
     return res;
   }
 
+  async onClWebCostGold({cost}) {
+    debug('  onClWebCostGold', cost);
+    if (!this.user.gold || this.user.gold < cost) throw codeError(1, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cost}});
+  }
+
   async onClWebCardDrawOnce({id}) {
     debug('  onClWebCardDrawOnce', id);
     const cardPool = await CardPool.findById(id);
     if (!cardPool) throw codeError(0, 'not found');
-
-    if (!this.user.gold || this.user.gold < cardPool.cost) throw codeError(1, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost}});
 
     const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
     const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
@@ -1676,9 +1680,6 @@ module.exports = class SocketIoSession {
     const cardPool = await CardPool.findById(id);
     if (!cardPool) throw codeError(0, 'not found');
     if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
-
-    if (!this.user.gold || this.user.gold < cardPool.cost * 10) throw codeError(2, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cardPool.cost * 10}});
 
     const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
     const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
