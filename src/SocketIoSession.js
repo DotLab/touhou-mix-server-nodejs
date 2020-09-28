@@ -273,8 +273,7 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
 
     this.socket.on('ClWebCostGold', createRpcHandler(this.onClWebCostGold.bind(this)));
-    this.socket.on('ClWebCardDrawOnce', createRpcHandler(this.onClWebCardDrawOnce.bind(this)));
-    this.socket.on('ClWebCardDrawEleven', createRpcHandler(this.onClWebCardDrawEleven.bind(this)));
+    this.socket.on('ClWebCardDraw', createRpcHandler(this.onClWebCardDraw.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1628,10 +1627,13 @@ module.exports = class SocketIoSession {
     return res;
   }
 
-  async onClWebCostGold({cost}) {
-    debug('  onClWebCostGold', cost);
+  async onClWebCostGold({cost, cards}) {
+    debug('  onClWebCostGold', cost, cards);
     if (!this.user.gold || this.user.gold < cost) throw codeError(1, 'not enough gold');
     await User.updateOne({_id: this.user.id}, {$inc: {gold: -cost}});
+    for (let i = 0; i < cards.length; i++) {
+      await UserHasCard.create({userId: this.user.id, cardId: cards[i].id, date: new Date()});
+    }
   }
 
   async onClWebCardDrawOnce({id}) {
@@ -1670,14 +1672,13 @@ module.exports = class SocketIoSession {
     const card = await Card.findById(new ObjectId(arr[ran]));
     if (!card) throw codeError(2, 'not found');
 
-    await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
     return serializeCard(card);
   }
 
-  async onClWebCardDrawEleven({id}) {
-    debug('  onClWebCardDrawEleven', id);
+  async onClWebCardDraw({cardPoolId, packInd}) {
+    debug('  onClWebCardDrawEleven', cardPoolId, packInd);
 
-    const cardPool = await CardPool.findById(id);
+    const cardPool = await CardPool.findById(cardPoolId);
     if (!cardPool) throw codeError(0, 'not found');
     if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
 
@@ -1687,7 +1688,8 @@ module.exports = class SocketIoSession {
     const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
 
     const res = [];
-    for (let i = 0; i < 11; i++) {
+    if (packInd > cardPool.pack.length) throw codeError(2, 'bad request');
+    for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
       let ran = Math.random() * 100;
       let deck = [];
       if (ran <= nRate) {
@@ -1713,7 +1715,6 @@ module.exports = class SocketIoSession {
       if (ran === arr.length) ran = arr.length - 1;
       const card = await Card.findById(new ObjectId(arr[ran]));
       if (!card) throw codeError(3, 'not found');
-      await UserHasCard.create({userId: this.user.id, cardId: card.id, date: new Date()});
       res.push(card);
     }
 
