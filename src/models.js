@@ -932,7 +932,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
 
 exports.serializeCardPool = function(CardPool) {
   let {
-    _id,
+    _id, creatorId,
     date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverPath, packs,
@@ -950,7 +950,7 @@ exports.serializeCardPool = function(CardPool) {
 
   return {
     id: _id,
-    date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
+    creatorId, date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverUrl, packs,
   };

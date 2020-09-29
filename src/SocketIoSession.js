@@ -127,6 +127,8 @@ module.exports = class SocketIoSession {
     this.pendingCode = null;
     this.sessionToken = null;
     this.sessionRecord = null;
+    this.cards = null;
+    this.cardsCost = null;
 
     socket.on('cl_handshake', this.onClHandshake.bind(this));
     socket.on('disconnect', this.onDisconnect.bind(this));
@@ -272,7 +274,7 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
 
-    this.socket.on('ClWebCostGold', createRpcHandler(this.onClWebCostGold.bind(this)));
+    this.socket.on('ClWebCardDrawConfirm', createRpcHandler(this.onClWebCardDrawConfirm.bind(this)));
     this.socket.on('ClWebCardDraw', createRpcHandler(this.onClWebCardDraw.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
@@ -1626,52 +1628,16 @@ module.exports = class SocketIoSession {
     return res;
   }
 
-  async onClWebCostGold({cost, cards}) {
-    debug('  onClWebCostGold', cost, cards);
-    if (!this.user.gold || this.user.gold < cost) throw codeError(1, 'not enough gold');
-    await User.updateOne({_id: this.user.id}, {$inc: {gold: -cost}});
-    for (let i = 0; i < cards.length; i++) {
-      await UserHasCard.create({userId: this.user.id, cardId: cards[i].id, date: new Date()});
+  async onClWebCardDrawConfirm() {
+    debug('  onClWebCardDrawConfirm');
+    if (!this.cards || !this.cardsCost) throw codeError(1, 'internal error');
+    if (!this.user.gold || this.user.gold < this.cardsCost) throw codeError(1, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -this.cardsCost}});
+    for (let i = 0; i < this.cards.length; i++) {
+      await UserHasCard.create({userId: this.user.id, cardId: this.cards[i].id, date: new Date()});
     }
-  }
-
-  async onClWebCardDrawOnce({id}) {
-    debug('  onClWebCardDrawOnce', id);
-    const cardPool = await CardPool.findById(id);
-    if (!cardPool) throw codeError(0, 'not found');
-
-    const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const srRate = cardPool.srCards.length === 0 ? 0 : (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    let ran = Math.random() * 100;
-
-    let deck = [];
-    if (ran <= nRate) {
-      deck = cardPool.nCards;
-    } else if (nRate < ran && ran <= nRate + rRate) {
-      deck = cardPool.rCards;
-    } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
-      deck = cardPool.srCards;
-    } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
-      deck = cardPool.ssrCards;
-    } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
-      deck = cardPool.urCards;
-    }
-
-    const arr = [];
-    deck.forEach((x) => {
-      for (let i = 0; i < parseInt(x.weight); i++) {
-        arr.push(x.cardId);
-      }
-    });
-
-    ran = Math.floor(Math.random() * arr.length);
-    if (ran === arr.length) ran = arr.length - 1;
-    const card = await Card.findById(new ObjectId(arr[ran]));
-    if (!card) throw codeError(2, 'not found');
-
-    return serializeCard(card);
+    this.cards = null;
+    this.cardsCost = null;
   }
 
   async onClWebCardDraw({cardPoolId, packInd}) {
@@ -1687,7 +1653,7 @@ module.exports = class SocketIoSession {
     const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
 
     const res = [];
-    if (packInd > cardPool.pack.length) throw codeError(2, 'bad request');
+    if (packInd > cardPool.packs.length) throw codeError(2, 'bad request');
     for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
       let ran = Math.random() * 100;
       let deck = [];
@@ -1716,6 +1682,8 @@ module.exports = class SocketIoSession {
       if (!card) throw codeError(3, 'not found');
       res.push(card);
     }
+    this.cards = res;
+    this.cardsCost = cardPool.packs[packInd].cost;
 
     return res.map((x) => serializeCard(x));
   }
