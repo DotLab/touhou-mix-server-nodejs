@@ -1578,28 +1578,6 @@ module.exports = class SocketIoSession {
     if (!cardPool) throw codeError(2, 'not found');
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
-<<<<<<< HEAD
-    let coverPath = '';
-    if (urCards && urCards.length != 0) {
-      const coverCard = await Card.findById(urCards[0].cardId);
-      coverPath = coverCard.coverPath;
-    } else if (ssrCards && ssrCards.length != 0) {
-      const coverCard = await Card.findById(ssrCards[0].cardId);
-      coverPath = coverCard.coverPath;
-    } else if (srCards && srCards.length != 0) {
-      const coverCard = await Card.findById(srCards[0].cardId);
-      coverPath = coverCard.coverPath;
-    } else if (rCards && rCards.length != 0) {
-      const coverCard = await Card.findById(rCards[0].cardId);
-      coverPath = coverCard.coverPath;
-    } else if (nCards && nCards.length != 0) {
-      const coverCard = await Card.findById(nCards[0].cardId);
-      coverPath = coverCard.coverPath;
-    }
-
-    update = filterUndefinedKeys({
-      name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-=======
     let cardId = null;
     let coverPath;
 
@@ -1619,7 +1597,6 @@ module.exports = class SocketIoSession {
 
     update = filterUndefinedKeys({
       name, desc, nCards, rCards, srCards, ssrCards, urCards,
->>>>>>> ad7e8e72595002d61ed64b55c1567204c096ab31
       nWeight, rWeight, srWeight, ssrWeight, urWeight, packs, coverPath,
     });
 
