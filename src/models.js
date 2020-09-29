@@ -913,7 +913,6 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   date: Date,
   name: String,
   desc: String,
-  cost: Number,
   coverPath: String,
 
   nWeight: Number,
@@ -934,7 +933,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
 exports.serializeCardPool = function(CardPool) {
   let {
     _id,
-    date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverPath, packs,
   } = CardPool;
@@ -951,7 +950,7 @@ exports.serializeCardPool = function(CardPool) {
 
   return {
     id: _id,
-    date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverUrl, packs,
   };
