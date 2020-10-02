@@ -1552,7 +1552,7 @@ module.exports = class SocketIoSession {
   async onClWebCardPoolUpdate(update) {
     debug('  onClWebCardPoolUpdate', update.id);
 
-    const {
+    let {
       id,
       name, desc, group, packs,
     } = update;
@@ -1566,7 +1566,7 @@ module.exports = class SocketIoSession {
 
     let cardId = null;
     if (group) {
-      cardPool.group = cardPool.group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
+      group = group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
       for (let i = group.length - 1; i >= 0; i--) {
         if (group[i].cards.length > 0) {
           cardId = group[i].cards[0].cardId;
@@ -1574,8 +1574,8 @@ module.exports = class SocketIoSession {
         }
       }
     }
-    let coverPath;
 
+    let coverPath;
     if (cardId) {
       const card = await this.onClWebCardGet({id: cardId});
       coverPath = card.coverPath;
