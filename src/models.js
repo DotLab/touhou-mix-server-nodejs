@@ -915,13 +915,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   desc: String,
   coverPath: String,
 
-  nWeight: Number,
-  rWeight: Number,
-  srWeight: Number,
-  ssrWeight: Number,
-  urWeight: Number,
-
-  group: [{name: String, cards: [{cardId: ObjectId, weight: Number}]}],
+  group: [{name: String, weight: Number, cards: [{cardId: ObjectId, weight: Number}]}],
   packs: [{name: String, cardNum: Number, cost: Number}],
 }));
 
@@ -929,21 +923,19 @@ exports.serializeCardPool = function(CardPool) {
   let {
     _id,
     date, name, desc, group,
-    nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverPath, packs,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
   }
 
-  group = group.map((x) => ({name: x.name, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
+  group = group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
 
   const coverUrl = BUCKET_URL + coverPath;
 
   return {
     id: _id,
     date, name, desc, group,
-    nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverUrl, packs,
   };
 };
@@ -962,11 +954,11 @@ exports.createDefaultCardPool = function() {
     urWeight: 1,
     coverPath: '',
 
-    group: [{name: 'N Cards', cards: []},
-      {name: 'R Cards', cards: []},
-      {name: 'SR Cards', cards: []},
-      {name: 'SSR Cards', cards: []},
-      {name: 'UR Cards', cards: []},
+    group: [{name: 'N Cards', weight: 1, cards: []},
+      {name: 'R Cards', weight: 1, cards: []},
+      {name: 'SR Cards', weight: 1, cards: []},
+      {name: 'SSR Cards', weight: 1, cards: []},
+      {name: 'UR Cards', weight: 1, cards: []},
     ],
     packs: [{name: 'once', cardNum: 1, cost: 10}, {name: 'multi', cardNum: 11, cost: 100}],
   };

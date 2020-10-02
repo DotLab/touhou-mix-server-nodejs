@@ -1544,7 +1544,7 @@ module.exports = class SocketIoSession {
     cards = cards.reduce((acc, cur) => {
       acc[cur._id.toString()] = cur; return acc;
     }, {});
-    cardPool.group = cardPool.group.map((x) => ({name: x.name, cards: x.cards.map((y) => ({...cards[y.cardId], weight: y.weight}))}));
+    cardPool.group = cardPool.group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => ({...cards[y.cardId], weight: y.weight}))}));
 
     return serializeCardPool(cardPool);
   }
@@ -1554,8 +1554,7 @@ module.exports = class SocketIoSession {
 
     const {
       id,
-      name, desc, group,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
+      name, desc, group, packs,
     } = update;
 
     if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
@@ -1567,6 +1566,7 @@ module.exports = class SocketIoSession {
 
     let cardId = null;
     if (group) {
+      cardPool.group = cardPool.group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
       for (let i = group.length - 1; i >= 0; i--) {
         if (group[i].cards.length > 0) {
           cardId = group[i].cards[0].cardId;
@@ -1582,8 +1582,7 @@ module.exports = class SocketIoSession {
     }
 
     update = filterUndefinedKeys({
-      name, desc, group,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs, coverPath,
+      name, desc, group, packs, coverPath,
     });
 
     cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
