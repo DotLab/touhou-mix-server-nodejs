@@ -1566,10 +1566,12 @@ module.exports = class SocketIoSession {
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     let cardId = null;
-    for (let i = group.length - 1; i >= 0; i--) {
-      if (group[i].cards.length > 0) {
-        cardId = group[i].cards[0].cardId;
-        break;
+    if (group) {
+      for (let i = group.length - 1; i >= 0; i--) {
+        if (group[i].cards.length > 0) {
+          cardId = group[i].cards[0].cardId;
+          break;
+        }
       }
     }
     let coverPath;
