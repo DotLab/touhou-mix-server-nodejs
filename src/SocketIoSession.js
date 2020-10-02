@@ -14,6 +14,7 @@ const {
   ROLE_MIDI_MOD,
   ROLE_MIDI_ADMIN,
   ROLE_CARD_MOD,
+  ROLE_CARDPOOL_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -104,7 +105,7 @@ function createRpcHandler(resolver) {
   };
 }
 
-const COVER_HEIGHT = 250;
+const COVER_HEIGHT = 600;
 const COVER_WIDTH = 900;
 
 module.exports = class SocketIoSession {
@@ -158,7 +159,7 @@ module.exports = class SocketIoSession {
     // generate
     await Promise.all([
       image.toFile(localPath),
-      meta.width > COVER_WIDTH && meta.height > COVER_HEIGHT ?
+      meta.width > COVER_WIDTH || meta.height > COVER_HEIGHT ?
           // crop
           image.resize(COVER_WIDTH, COVER_HEIGHT).jpeg({quality: 80}).toFile(coverLocalPath) :
           image.jpeg({quality: 80}).toFile(coverLocalPath),
@@ -1514,7 +1515,7 @@ module.exports = class SocketIoSession {
 
   async onClWebCardPoolCreate() {
     debug('  onClWebCardPoolCreate');
-    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARDPOOL_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const cardPool = await CardPool.create({
       ...createDefaultCardPool(),
@@ -1536,24 +1537,14 @@ module.exports = class SocketIoSession {
 
     if (!cardPool) throw codeError(1, 'not found');
 
-    const cardIds = [
-      ...cardPool.nCards,
-      ...cardPool.rCards,
-      ...cardPool.srCards,
-      ...cardPool.ssrCards,
-      ...cardPool.urCards,
-    ].map((x) => x.cardId);
+    const cardIds = [];
+    cardPool.group.forEach((x) => x.cards.forEach((y) => cardIds.push(y.cardId)));
 
     let cards = await Card.find({_id: {$in: cardIds}}).lean();
     cards = cards.reduce((acc, cur) => {
       acc[cur._id.toString()] = cur; return acc;
     }, {});
-
-    cardPool.nCards = cardPool.nCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.rCards = cardPool.rCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.srCards = cardPool.srCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.ssrCards = cardPool.ssrCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.urCards = cardPool.urCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.group = cardPool.group.map((x) => ({name: x.name, cards: x.cards.map((y) => ({...cards[y.cardId], weight: y.weight}))}));
 
     return serializeCardPool(cardPool);
   }
@@ -1563,7 +1554,7 @@ module.exports = class SocketIoSession {
 
     const {
       id,
-      name, desc, nCards, rCards, srCards, ssrCards, urCards,
+      name, desc, group,
       nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
     } = update;
 
@@ -1575,24 +1566,21 @@ module.exports = class SocketIoSession {
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     let cardId = null;
+    for (let i = group.length - 1; i >= 0; i--) {
+      if (group[i].cards.length > 0) {
+        cardId = group[i].cards[0].cardId;
+        break;
+      }
+    }
     let coverPath;
 
-    if (urCards) {
-      cardId = urCards[0].cardId;
-    } else if (ssrCards) {
-      cardId = ssrCards[0].cardId;
-    } else if (srCards) {
-      cardId = srCards[0].cardId;
-    } else if (rCards) {
-      cardId = rCards[0].cardId;
-    }
     if (cardId) {
       const card = await this.onClWebCardGet({id: cardId});
       coverPath = card.coverPath;
     }
 
     update = filterUndefinedKeys({
-      name, desc, nCards, rCards, srCards, ssrCards, urCards,
+      name, desc, group,
       nWeight, rWeight, srWeight, ssrWeight, urWeight, packs, coverPath,
     });
 

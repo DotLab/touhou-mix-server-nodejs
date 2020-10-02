@@ -921,36 +921,28 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   ssrWeight: Number,
   urWeight: Number,
 
-  nCards: [{cardId: ObjectId, weight: Number}],
-  rCards: [{cardId: ObjectId, weight: Number}],
-  srCards: [{cardId: ObjectId, weight: Number}],
-  ssrCards: [{cardId: ObjectId, weight: Number}],
-  urCards: [{cardId: ObjectId, weight: Number}],
-
+  group: [{name: String, cards: [{cardId: ObjectId, weight: Number}]}],
   packs: [{name: String, cardNum: Number, cost: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
   let {
     _id,
-    date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, desc, group,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverPath, packs,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
   }
-  nCards = nCards ? nCards.map((x) => exports.serializeCard(x)) : nCards;
-  rCards = rCards ? rCards.map((x) => exports.serializeCard(x)) : rCards;
-  srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
-  ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
-  urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
+
+  group = group.map((x) => ({name: x.name, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
 
   const coverUrl = BUCKET_URL + coverPath;
 
   return {
     id: _id,
-    date, name, desc, nCards, rCards, srCards, ssrCards, urCards,
+    date, name, desc, group,
     nWeight, rWeight, srWeight, ssrWeight, urWeight,
     creator, coverUrl, packs,
   };
@@ -970,12 +962,13 @@ exports.createDefaultCardPool = function() {
     urWeight: 1,
     coverPath: '',
 
-    nCards: [],
-    rCards: [],
-    srCards: [],
-    ssrCards: [],
-    urCards: [],
-    packs: [],
+    group: [{name: 'N Cards', cards: []},
+      {name: 'R Cards', cards: []},
+      {name: 'SR Cards', cards: []},
+      {name: 'SSR Cards', cards: []},
+      {name: 'UR Cards', cards: []},
+    ],
+    packs: [{name: 'once', cardNum: 1, cost: 10}, {name: 'multi', cardNum: 11, cost: 100}],
   };
 };
 
@@ -984,4 +977,4 @@ exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
   userId: ObjectId,
   cardId: ObjectId,
   date: Date,
-}));
+}, {collection: 'userHasCards'}));
