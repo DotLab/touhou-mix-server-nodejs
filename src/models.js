@@ -909,7 +909,6 @@ exports.serializeCard = function(card) {
 /** @type {import('mongoose').Model<Object>} */
 exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   creatorId: ObjectId,
-
   date: Date,
   name: String,
   desc: String,
@@ -943,15 +942,9 @@ exports.serializeCardPool = function(CardPool) {
 exports.createDefaultCardPool = function() {
   return {
     creatorId: '',
-
     name: '',
     desc: '',
     cost: 0,
-    nWeight: 1,
-    rWeight: 1,
-    srWeight: 1,
-    ssrWeight: 1,
-    urWeight: 1,
     coverPath: '',
 
     group: [{name: 'N Cards', weight: 1, cards: []},
