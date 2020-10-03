@@ -107,8 +107,8 @@ function createRpcHandler(resolver) {
 
 const CARD_COVER_HEIGHT = 200;
 const CARD_COVER_WIDTH = 150;
-const COVER_HEIGHT = 200;
-const COVER_WIDTH = 150;
+const COVER_HEIGHT = 250;
+const COVER_WIDTH = 900;
 
 module.exports = class SocketIoSession {
   /**
