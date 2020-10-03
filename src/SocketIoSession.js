@@ -14,6 +14,7 @@ const {
   ROLE_MIDI_MOD,
   ROLE_MIDI_ADMIN,
   ROLE_CARD_MOD,
+  ROLE_CARDPOOL_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -105,8 +106,15 @@ function createRpcHandler(resolver) {
   };
 }
 
+<<<<<<< HEAD
 const COVER_HEIGHT = 700;
 const COVER_WIDTH = 500;
+=======
+const CARD_COVER_HEIGHT = 200;
+const CARD_COVER_WIDTH = 150;
+const COVER_HEIGHT = 250;
+const COVER_WIDTH = 900;
+>>>>>>> 87a7beecfb2facda97d2ab7bb2817a9dad8ee122
 
 module.exports = class SocketIoSession {
   /**
@@ -138,7 +146,7 @@ module.exports = class SocketIoSession {
     return User.findByIdAndUpdate(this.user.id, spec, {new: true});
   }
 
-  async uploadCover(buffer) {
+  async uploadCover(buffer, height, width) {
     const hash = calcFileHash(buffer);
     const image = sharp(buffer);
     const meta = await image.metadata();
@@ -161,9 +169,13 @@ module.exports = class SocketIoSession {
     // generate
     await Promise.all([
       image.toFile(localPath),
+<<<<<<< HEAD
       meta.width > COVER_WIDTH || meta.height > COVER_HEIGHT ?
+=======
+      meta.width > width || meta.height > height ?
+>>>>>>> 87a7beecfb2facda97d2ab7bb2817a9dad8ee122
           // crop
-          image.resize(COVER_WIDTH, COVER_HEIGHT).jpeg({quality: 80}).toFile(coverLocalPath) :
+          image.resize(width, height).jpeg({quality: 80}).toFile(coverLocalPath) :
           image.jpeg({quality: 80}).toFile(coverLocalPath),
       image.resize(256, 256).modulate({brightness: 1.05, saturation: 2}).blur(12)
           .resize(128, 128).png().toFile(blurLocalPath),
@@ -579,7 +591,7 @@ module.exports = class SocketIoSession {
     if (!midi) return error(done, 'not found');
     if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, ERROR_FORBIDDEN);
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, COVER_HEIGHT, COVER_WIDTH);
     midi = await Midi.findByIdAndUpdate(id, {$set: {
       imagePath: paths.path,
       coverPath: paths.coverPath,
@@ -845,7 +857,7 @@ module.exports = class SocketIoSession {
     let album = await Album.findById(id);
     if (!album) return error(done, 'not found');
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, COVER_HEIGHT, COVER_WIDTH);
     album = await Album.findByIdAndUpdate(id, {$set: {
       imagePath: paths.path,
       coverPath: paths.coverPath,
@@ -1453,7 +1465,7 @@ module.exports = class SocketIoSession {
     if (!card) throw codeError(3, 'not found');
     if (!card.uploaderId.equals(this.user.id)) throw codeError(4, ERROR_FORBIDDEN);
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, CARD_COVER_HEIGHT, CARD_COVER_WIDTH);
     switch (type) {
       case 'portrait':
         card = await Card.findByIdAndUpdate(id, {$set: {
@@ -1520,7 +1532,7 @@ module.exports = class SocketIoSession {
 
   async onClWebCardPoolCreate() {
     debug('  onClWebCardPoolCreate');
-    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARDPOOL_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const cardPool = await CardPool.create({
       ...createDefaultCardPool(),
@@ -1542,24 +1554,14 @@ module.exports = class SocketIoSession {
 
     if (!cardPool) throw codeError(1, 'not found');
 
-    const cardIds = [
-      ...cardPool.nCards,
-      ...cardPool.rCards,
-      ...cardPool.srCards,
-      ...cardPool.ssrCards,
-      ...cardPool.urCards,
-    ].map((x) => x.cardId);
+    const cardIds = [];
+    cardPool.group.forEach((x) => x.cards.forEach((y) => cardIds.push(y.cardId)));
 
     let cards = await Card.find({_id: {$in: cardIds}}).lean();
     cards = cards.reduce((acc, cur) => {
       acc[cur._id.toString()] = cur; return acc;
     }, {});
-
-    cardPool.nCards = cardPool.nCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.rCards = cardPool.rCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.srCards = cardPool.srCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.ssrCards = cardPool.ssrCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
-    cardPool.urCards = cardPool.urCards.map((x) => ({...cards[x.cardId], weight: x.weight}));
+    cardPool.group = cardPool.group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => ({...cards[y.cardId], weight: y.weight}))}));
 
     return serializeCardPool(cardPool);
   }
@@ -1567,10 +1569,9 @@ module.exports = class SocketIoSession {
   async onClWebCardPoolUpdate(update) {
     debug('  onClWebCardPoolUpdate', update.id);
 
-    const {
+    let {
       id,
-      name, desc, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs,
+      name, desc, group, packs,
     } = update;
 
     if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
@@ -1581,25 +1582,24 @@ module.exports = class SocketIoSession {
     if (!cardPool.creatorId.equals(this.user.id)) throw codeError(3, ERROR_FORBIDDEN);
 
     let cardId = null;
-    let coverPath;
-
-    if (urCards) {
-      cardId = urCards[0].cardId;
-    } else if (ssrCards) {
-      cardId = ssrCards[0].cardId;
-    } else if (srCards) {
-      cardId = srCards[0].cardId;
-    } else if (rCards) {
-      cardId = rCards[0].cardId;
+    if (group) {
+      group = group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
+      for (let i = group.length - 1; i >= 0; i--) {
+        if (group[i].cards.length > 0) {
+          cardId = group[i].cards[0].cardId;
+          break;
+        }
+      }
     }
+
+    let coverPath;
     if (cardId) {
-      const card = await this.onClWebCardGet({id: cardId});
+      const card = await Card.findById(cardId);
       coverPath = card.coverPath;
     }
 
     update = filterUndefinedKeys({
-      name, desc, nCards, rCards, srCards, ssrCards, urCards,
-      nWeight, rWeight, srWeight, ssrWeight, urWeight, packs, coverPath,
+      name, desc, group, packs, coverPath,
     });
 
     cardPool = await CardPool.findByIdAndUpdate(id, {$set: update}, {new: true});
