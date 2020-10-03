@@ -909,65 +909,59 @@ exports.serializeCard = function(card) {
 /** @type {import('mongoose').Model<Object>} */
 exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
   creatorId: ObjectId,
-
   date: Date,
   name: String,
   desc: String,
-  cost: Number,
+  coverPath: String,
 
-  nWeight: Number,
-  rWeight: Number,
-  srWeight: Number,
-  ssrWeight: Number,
-  urWeight: Number,
-
-  nCards: [{cardId: ObjectId, weight: Number}],
-  rCards: [{cardId: ObjectId, weight: Number}],
-  srCards: [{cardId: ObjectId, weight: Number}],
-  ssrCards: [{cardId: ObjectId, weight: Number}],
-  urCards: [{cardId: ObjectId, weight: Number}],
+  group: [{name: String, weight: Number, cards: [{cardId: ObjectId, weight: Number}]}],
+  packs: [{name: String, cardNum: Number, cost: Number}],
 }));
 
 exports.serializeCardPool = function(CardPool) {
   let {
     _id,
-    date, name, cost, desc, nCards, rCards, srCards, ssrCards, urCards,
-    nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    date, name, desc, group,
+    creator, coverPath, packs,
   } = CardPool;
   if (creator) {
     creator = exports.serializeUser(creator);
   }
-  nCards = nCards ? nCards.map((x) => exports.serializeCard(x)) : nCards;
-  rCards = rCards ? rCards.map((x) => exports.serializeCard(x)) : rCards;
-  srCards = srCards ? srCards.map((x) => exports.serializeCard(x)) : srCards;
-  ssrCards = ssrCards ? ssrCards.map((x) => exports.serializeCard(x)) : ssrCards;
-  urCards = urCards ? urCards.map((x) => exports.serializeCard(x)) : urCards;
+
+  group = group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
+
   return {
     id: _id,
-    date, name, desc, cost, nCards, rCards, srCards, ssrCards, urCards,
-    nWeight, rWeight, srWeight, ssrWeight, urWeight,
-    creator,
+    date, name, desc, group,
+    creator, coverUrl: BUCKET_URL + coverPath, packs,
   };
 };
 
 exports.createDefaultCardPool = function() {
   return {
     creatorId: '',
-
     name: '',
     desc: '',
     cost: 0,
-    nWeight: 1,
-    rWeight: 1,
-    srWeight: 1,
-    ssrWeight: 1,
-    urWeight: 1,
+    coverPath: '',
 
-    nCards: [],
-    rCards: [],
-    srCards: [],
-    ssrCards: [],
-    urCards: [],
+    group: [
+      {name: 'UR Cards', weight: 1, cards: []},
+      {name: 'SSR Cards', weight: 1, cards: []},
+      {name: 'SR Cards', weight: 1, cards: []},
+      {name: 'R Cards', weight: 1, cards: []},
+      {name: 'N Cards', weight: 1, cards: []},
+    ],
+    packs: [
+      {name: 'Draw 1 Card', cardNum: 1, cost: 10},
+      {name: 'Draw 11 Cards', cardNum: 11, cost: 100},
+    ],
   };
 };
+
+/** @type {import('mongoose').Model<Object>} */
+exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
+  userId: ObjectId,
+  cardId: ObjectId,
+  date: Date,
+}, {collection: 'userHasCards'}));
