@@ -105,8 +105,8 @@ function createRpcHandler(resolver) {
   };
 }
 
-const COVER_HEIGHT = 600;
-const COVER_WIDTH = 900;
+const COVER_HEIGHT = 200;
+const COVER_WIDTH = 150;
 
 module.exports = class SocketIoSession {
   /**
