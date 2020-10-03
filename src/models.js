@@ -947,13 +947,17 @@ exports.createDefaultCardPool = function() {
     cost: 0,
     coverPath: '',
 
-    group: [{name: 'N Cards', weight: 1, cards: []},
-      {name: 'R Cards', weight: 1, cards: []},
-      {name: 'SR Cards', weight: 1, cards: []},
-      {name: 'SSR Cards', weight: 1, cards: []},
+    group: [
       {name: 'UR Cards', weight: 1, cards: []},
+      {name: 'SSR Cards', weight: 1, cards: []},
+      {name: 'SR Cards', weight: 1, cards: []},
+      {name: 'R Cards', weight: 1, cards: []},
+      {name: 'N Cards', weight: 1, cards: []},
     ],
-    packs: [{name: 'once', cardNum: 1, cost: 10}, {name: 'multi', cardNum: 11, cost: 100}],
+    packs: [
+      {name: 'Draw 1 Card', cardNum: 1, cost: 10},
+      {name: 'Draw 11 Cards', cardNum: 11, cost: 100},
+    ],
   };
 };
 
