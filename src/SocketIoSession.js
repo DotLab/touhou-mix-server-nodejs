@@ -105,6 +105,8 @@ function createRpcHandler(resolver) {
   };
 }
 
+const CARD_COVER_HEIGHT = 200;
+const CARD_COVER_WIDTH = 150;
 const COVER_HEIGHT = 200;
 const COVER_WIDTH = 150;
 
@@ -136,7 +138,7 @@ module.exports = class SocketIoSession {
     return User.findByIdAndUpdate(this.user.id, spec, {new: true});
   }
 
-  async uploadCover(buffer) {
+  async uploadCover(buffer, height, width) {
     const hash = calcFileHash(buffer);
     const image = sharp(buffer);
     const meta = await image.metadata();
@@ -159,9 +161,9 @@ module.exports = class SocketIoSession {
     // generate
     await Promise.all([
       image.toFile(localPath),
-      meta.width > COVER_WIDTH || meta.height > COVER_HEIGHT ?
+      meta.width > width || meta.height > height ?
           // crop
-          image.resize(COVER_WIDTH, COVER_HEIGHT).jpeg({quality: 80}).toFile(coverLocalPath) :
+          image.resize(width, height).jpeg({quality: 80}).toFile(coverLocalPath) :
           image.jpeg({quality: 80}).toFile(coverLocalPath),
       image.resize(256, 256).modulate({brightness: 1.05, saturation: 2}).blur(12)
           .resize(128, 128).png().toFile(blurLocalPath),
@@ -574,7 +576,7 @@ module.exports = class SocketIoSession {
     if (!midi) return error(done, 'not found');
     if (!midi.uploaderId.equals(this.user.id) && !this.checkUserRole(ROLE_MIDI_MOD)) return error(done, ERROR_FORBIDDEN);
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, COVER_HEIGHT, COVER_WIDTH);
     midi = await Midi.findByIdAndUpdate(id, {$set: {
       imagePath: paths.path,
       coverPath: paths.coverPath,
@@ -840,7 +842,7 @@ module.exports = class SocketIoSession {
     let album = await Album.findById(id);
     if (!album) return error(done, 'not found');
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, COVER_HEIGHT, COVER_WIDTH);
     album = await Album.findByIdAndUpdate(id, {$set: {
       imagePath: paths.path,
       coverPath: paths.coverPath,
@@ -1448,7 +1450,7 @@ module.exports = class SocketIoSession {
     if (!card) throw codeError(3, 'not found');
     if (!card.uploaderId.equals(this.user.id)) throw codeError(4, ERROR_FORBIDDEN);
 
-    const paths = await this.uploadCover(buffer);
+    const paths = await this.uploadCover(buffer, CARD_COVER_HEIGHT, CARD_COVER_WIDTH);
     switch (type) {
       case 'portrait':
         card = await Card.findByIdAndUpdate(id, {$set: {
