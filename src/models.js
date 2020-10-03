@@ -930,12 +930,10 @@ exports.serializeCardPool = function(CardPool) {
 
   group = group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
 
-  const coverUrl = BUCKET_URL + coverPath;
-
   return {
     id: _id,
     date, name, desc, group,
-    creator, coverUrl, packs,
+    creator, coverUrl: BUCKET_URL + coverPath, packs,
   };
 };
 
