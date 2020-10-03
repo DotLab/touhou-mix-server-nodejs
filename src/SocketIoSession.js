@@ -1579,7 +1579,7 @@ module.exports = class SocketIoSession {
 
     let coverPath;
     if (cardId) {
-      const card = await this.onClWebCardGet({id: cardId});
+      const card = await Card.findById(cardId);
       coverPath = card.coverPath;
     }
 
