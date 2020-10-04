@@ -38,7 +38,7 @@ const {
   CardPool, createDefaultCardPool, serializeCardPool,
   UserHasCard,
 } = require('./models');
-const {NAME_ARTIFACT} = require('./TranslationService');
+const {NAME_ARTIFACT, UI_APP, UI_WEB} = require('./TranslationService');
 
 const {verifyRecaptcha, verifyObjectId, emptyHandle, sendCodeEmail, filterUndefinedKeys, deleteEmptyKeys, sortQueryToSpec, getTimeBetween} = require('./utils');
 
@@ -733,7 +733,11 @@ module.exports = class SocketIoSession {
 
   async onClWebTranslationList({lang}, done) {
     debug('  onClWebTranslationList', lang);
-    return success(done, await Translation.find({lang, active: true}).sort({namespace: 1, src: 1}).lean());
+    return success(done, await Translation.find({
+      lang,
+      active: true,
+      namespace: {$in: [UI_APP, UI_WEB]},
+    }).sort({namespace: 1, src: 1}).lean());
   }
 
   async onClWebTranslationUpdate({lang, src, text, namespace}, done) {
@@ -1622,8 +1626,8 @@ module.exports = class SocketIoSession {
     const res = await Midi.aggregate([
       {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
       {$project: {sourceAlbumName: 1, sourceSongName: 1}},
-      {$group: {_id: '$sourceAlbumName', songs: {$push: '$$ROOT'}, albumMidis: {$push: '$_id'}}},
-      {$addFields: {name: '$_id'}},
+      {$group: {_id: '$sourceSongName', midiIds: {$push: '$_id'}, sourceAlbumName: {$first: '$sourceAlbumName'}}},
+      {$group: {_id: '$sourceAlbumName', songs: {$push: {_id: '$_id', midiIds: '$midiIds'}}}},
     ]);
     return res;
   }
