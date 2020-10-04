@@ -106,15 +106,10 @@ function createRpcHandler(resolver) {
   };
 }
 
-<<<<<<< HEAD
-const COVER_HEIGHT = 700;
-const COVER_WIDTH = 500;
-=======
 const CARD_COVER_HEIGHT = 200;
 const CARD_COVER_WIDTH = 150;
 const COVER_HEIGHT = 250;
 const COVER_WIDTH = 900;
->>>>>>> 87a7beecfb2facda97d2ab7bb2817a9dad8ee122
 
 module.exports = class SocketIoSession {
   /**
@@ -169,11 +164,7 @@ module.exports = class SocketIoSession {
     // generate
     await Promise.all([
       image.toFile(localPath),
-<<<<<<< HEAD
-      meta.width > COVER_WIDTH || meta.height > COVER_HEIGHT ?
-=======
       meta.width > width || meta.height > height ?
->>>>>>> 87a7beecfb2facda97d2ab7bb2817a9dad8ee122
           // crop
           image.resize(width, height).jpeg({quality: 80}).toFile(coverLocalPath) :
           image.jpeg({quality: 80}).toFile(coverLocalPath),
