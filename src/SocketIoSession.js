@@ -1611,8 +1611,8 @@ module.exports = class SocketIoSession {
     const res = await Midi.aggregate([
       {$match: {$and: [{songId: {$eq: null}}, {$or: [{sourceAlbumName: {$ne: ''}}, {sourceSongName: {$ne: ''}}]}]}},
       {$project: {sourceAlbumName: 1, sourceSongName: 1}},
-      {$group: {_id: '$sourceAlbumName', songs: {$push: '$$ROOT'}, albumMidis: {$push: '$_id'}}},
-      {$addFields: {name: '$_id'}},
+      {$group: {_id: '$sourceSongName', midiIds: {$push: '$_id'}, sourceAlbumName: {$first: '$sourceAlbumName'}}},
+      {$group: {_id: '$sourceAlbumName', songs: {$push: {_id: '$_id', midiIds: '$midiIds'}}}},
     ]);
     return res;
   }
