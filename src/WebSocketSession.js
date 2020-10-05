@@ -21,7 +21,6 @@ const {getTimeBetween} = require('./utils');
 const {midiController, commentController} = require('./controllers');
 
 function codeError(code, error) {
-  // return `${error} (${code})`;
   return `${error}`;
 }
 
