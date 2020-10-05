@@ -1642,7 +1642,7 @@ module.exports = class SocketIoSession {
     if (!cardPool) throw codeError(0, 'not found');
     if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
 
-    const cardWeights = [];
+    const cardRates = [];
     const cardWeightSums = [];
     const groupWeights = [];
     const groupWeightSum = cardPool.group.reduce((acc, cur) => acc + parseFloat(cur.weight), 0);
@@ -1652,17 +1652,24 @@ module.exports = class SocketIoSession {
       cardWeightSums.push(x.cards.reduce((acc, cur) => acc + parseFloat(cur.weight), 0));
       groupWeights.push(x.weight);
       x.cards.forEach((y) =>{
-        cardWeights.push(y.weight / cardWeightSums[i] * groupWeights[i] / groupWeightSum);
+        cardRates.push(y.weight / cardWeightSums[i] * groupWeights[i] / groupWeightSum);
         cardIndex.push(y.cardId);
       });
     });
 
     const res = [];
     if (packInd > cardPool.packs.length) throw codeError(2, 'bad request');
-    if (cardWeights.length == 0) return [];
+    if (cardRates.length == 0) return [];
+
+    let currSum = cardRates[0];
+    const acc = [];
+    cardRates.forEach((x) => {
+      acc.push(currSum);
+      currSum += x;
+    });
 
     for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
-      const targetIndex = binarySearch(cardWeights);
+      const targetIndex = binarySearch(acc);
       const card = await Card.findById(cardIndex[targetIndex]);
       res.push(card);
     }
@@ -1673,14 +1680,10 @@ module.exports = class SocketIoSession {
   }
 };
 
-function binarySearch(arr) {
-  let c = 0;
-  const acc = arr.map((x) => {
-    return c += x;
-  });
+function binarySearch(acc) {
   const targetDist = Math.random();
   let low = 0;
-  let high = arr.length;
+  let high = acc.length;
   while (low < high) {
     const mid = parseInt(low + (high - low) / 2);
     const distance = acc[mid];
