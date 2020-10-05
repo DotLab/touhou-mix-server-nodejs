@@ -1579,7 +1579,7 @@ module.exports = class SocketIoSession {
     let cardId = null;
     if (group) {
       group = group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
-      for (let i = group.length - 1; i >= 0; i--) {
+      for (let i = 0; i < group.length; i++) {
         if (group[i].cards.length > 0) {
           cardId = group[i].cards[0].cardId;
           break;
@@ -1636,45 +1636,34 @@ module.exports = class SocketIoSession {
   }
 
   async onClWebCardDraw({cardPoolId, packInd}) {
-    debug('  onClWebCardDrawEleven', cardPoolId, packInd);
+    debug('  onClWebCardDraw', cardPoolId, packInd);
 
     const cardPool = await CardPool.findById(cardPoolId);
     if (!cardPool) throw codeError(0, 'not found');
     if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
 
-    const nRate = cardPool.nCards.length === 0 ? 0 : (parseFloat(cardPool.nWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const rRate = cardPool.rCards.length === 0 ? 0 : (parseFloat(cardPool.rWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const srRate = cardPool.srCards.length === 0 ? 0 : (parseFloat(cardPool.srWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
-    const ssrRate = cardPool.ssrCards.length === 0 ? 0 : (parseFloat(cardPool.ssrWeight) /(parseFloat(cardPool.nWeight) + parseFloat(cardPool.rWeight) + parseFloat(cardPool.srWeight) + parseFloat(cardPool.ssrWeight) + parseFloat(cardPool.urWeight))*100);
+    const cardWeights = [];
+    const cardWeightSums = [];
+    const groupWeights = [];
+    const groupWeightSum = cardPool.group.reduce((acc, cur) => acc + parseFloat(cur.weight), 0);
+    const cardIndex = [];
+
+    cardPool.group.forEach((x, i) => {
+      cardWeightSums.push(x.cards.reduce((acc, cur) => acc + parseFloat(cur.weight), 0));
+      groupWeights.push(x.weight);
+      x.cards.forEach((y) =>{
+        cardWeights.push(y.weight / cardWeightSums[i] * groupWeights[i] / groupWeightSum);
+        cardIndex.push(y.cardId);
+      });
+    });
 
     const res = [];
     if (packInd > cardPool.packs.length) throw codeError(2, 'bad request');
+    if (cardWeights.length == 0) return [];
+
     for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
-      let ran = Math.random() * 100;
-      let deck = [];
-      if (ran <= nRate) {
-        deck = cardPool.nCards;
-      } else if (nRate < ran && ran <= nRate + rRate) {
-        deck = cardPool.rCards;
-      } else if (nRate + rRate < ran && ran <= nRate + rRate + srRate) {
-        deck = cardPool.srCards;
-      } else if (nRate + rRate + srRate < ran && ran <= nRate + rRate + srRate + ssrRate) {
-        deck = cardPool.ssrCards;
-      } else if (nRate + rRate + srRate + ssrRate < ran && ran <= 100) {
-        deck = cardPool.urCards;
-      }
-
-      const arr = [];
-      deck.forEach((x) => {
-        for (let i = 0; i < parseInt(x.weight); i++) {
-          arr.push(x.cardId);
-        }
-      });
-
-      ran = Math.floor(Math.random() * arr.length);
-      if (ran === arr.length) ran = arr.length - 1;
-      const card = await Card.findById(new ObjectId(arr[ran]));
-      if (!card) throw codeError(3, 'not found');
+      const targetIndex = binarySearch(cardWeights);
+      const card = await Card.findById(cardIndex[targetIndex]);
       res.push(card);
     }
     this.cards = res;
@@ -1683,3 +1672,21 @@ module.exports = class SocketIoSession {
     return res.map((x) => serializeCard(x));
   }
 };
+
+function binarySearch(arr) {
+  let c = 0;
+  const acc = arr.map((x) => {
+    return c += x;
+  });
+  const targetDist = Math.random();
+  let low = 0;
+  let high = arr.length;
+  while (low < high) {
+    const mid = parseInt(low + (high - low) / 2);
+    const distance = acc[mid];
+    if (distance < targetDist) low = mid + 1;
+    else if (distance > targetDist) high = mid;
+    else return mid;
+  }
+  return low;
+}
