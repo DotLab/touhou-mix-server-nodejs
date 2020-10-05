@@ -18,10 +18,11 @@ const {
   ErrorReport,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
-const {midiController} = require('./controllers');
+const {midiController, commentController} = require('./controllers');
 
 function codeError(code, error) {
-  return `${error} (${code})`;
+  // return `${error} (${code})`;
+  return `${error}`;
 }
 
 const PASSWORD_HASHER = 'sha512';
@@ -126,6 +127,8 @@ module.exports = class WebSocketSession {
         case 'ClAppMidiDownload': this.onClAppMidiDownload(id, args); break;
         case 'ClAppPing': this.onClAppPing(id, args); break;
         case 'ClAppMidiAction': this.onClAppMidiAction(id, args); break;
+        case 'ClAppMidiCommentCreate': this.wrapRpcHandler(id, args, this.onClAppMidiCommentCreate.bind(this)); break;
+        case 'ClAppMidiCommentList': this.wrapRpcHandler(id, args, this.onClAppMidiCommentList.bind(this)); break;
         case 'ClAppTrialUpload': this.onClAppTrialUpload(id, args); break;
         case 'ClAppCheckVersion': this.onClAppCheckVersion(id, args); break;
         case 'ClAppMidiRecordList': this.onClAppMidiRecordList(id, args); break;
@@ -318,6 +321,55 @@ module.exports = class WebSocketSession {
     await processDocAction(Midi, MIDIS, this.user.id, midi._id, action, value);
 
     this.returnSuccess(id);
+  }
+
+  async getMidiBestCommentTrial(midiId) {
+    if (!this.user) return null;
+    const commentTrials = await Trial.find({
+      userId: this.user._id,
+      midiId,
+
+      withdrew: false,
+      score: {$gt: 20000},
+      accuracy: {$gt: .9},
+    }).sort({performance: -1}).limit(1);
+    if (commentTrials.length != 1) {
+      return null;
+    }
+    return commentTrials[0];
+  }
+
+  async onClAppMidiCommentCreate({hash, text}) {
+    debug('  onClAppMidiCommentCreate', hash, text);
+
+    if (!this.user) throw codeError(0, 'forbidden');
+    const midi = await Midi.findOne({hash});
+    if (!midi) throw codeError(1, 'not found');
+
+    const commentTrial = await this.getMidiBestCommentTrial(midi._id);
+    if (!commentTrial) {
+      throw codeError(2, 'not enough performance');
+    }
+    await commentController.create({user: this.user, docId: midi._id, text, data: {
+      trialId: commentTrial._id,
+      trialGrade: commentTrial.grade,
+      trialPerformance: commentTrial.performance,
+    }});
+    return {comments: await commentController.list({docId: midi._id})};
+  }
+
+  async onClAppMidiCommentList({hash}) {
+    debug('  onClAppMidiCommentList', hash);
+
+    const midi = await Midi.findOne({hash});
+    if (!midi) throw codeError(0, 'not found');
+
+    const commentTrial = await this.getMidiBestCommentTrial(midi._id);
+    return {
+      canComment: !!commentTrial,
+      trialGrade: commentTrial && commentTrial.grade,
+      comments: await commentController.list({docId: midi._id}),
+    };
   }
 
   async onClAppTrialUpload(id, trial) {

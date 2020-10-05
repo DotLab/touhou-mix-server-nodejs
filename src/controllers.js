@@ -5,10 +5,10 @@ const {
 
 exports.commentController = {
   create: async function({
-    user: {_id: userId, name: userName, avatarPath: userAvatarPath}, docId, text}) {
+    user: {_id: userId, name: userName, avatarPath: userAvatarPath}, docId, text, data}) {
     const comment = await DocComment.create({
       docId, userId, userName, userAvatarPath,
-      text, date: new Date(),
+      text, date: new Date(), data,
     });
     return serializeDocComment(comment);
   },
