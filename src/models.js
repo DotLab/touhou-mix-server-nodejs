@@ -462,7 +462,8 @@ exports.serializeDocComment = function(doc) {
   return {
     _id,
     docId,
-    userId, userName, userAvatarPath, userAvatarUrl: BUCKET_URL + userAvatarPath,
+    userId, userName,
+    userAvatarPath, userAvatarUrl: userAvatarPath && BUCKET_URL + userAvatarPath,
     text, date, data,
   };
 };
