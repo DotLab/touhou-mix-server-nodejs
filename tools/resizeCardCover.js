@@ -49,6 +49,7 @@ const fetch = require('node-fetch');
       gzip: true,
       metadata: {
         cacheControl: 'public, max-age=31536000',
+        acl: [{entity: 'allUsers', role: storage.acl.READER_ROLE}],
       },
     });
 
