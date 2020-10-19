@@ -29,7 +29,7 @@ const fetch = require('node-fetch');
   cards.forEach(async (card) => {
     const tokens = card.coverPath.split('/');
     let hash = tokens[tokens.length - 1];
-    hash = hash.substring(0, hash.length - 4);
+    hash = hash.substring(0, hash.length - 5);
 
     const res = await fetch(BUCKET_URL + card.coverPath);
     const buffer = await res.buffer();
@@ -41,11 +41,10 @@ const fetch = require('node-fetch');
     const coverLocalPath = tempPath + '/' + coverFileName;
     const coverRemotePath = '/imgs/' + coverFileName;
 
-    // await image.toFile(localPath);
     await image.resize(150, 200).jpeg({quality: 80}).toFile(coverLocalPath);
 
     await storage.bucket('microvolt-bucket-1').upload(coverLocalPath, {
-      coverRemotePath,
+      destination: coverRemotePath,
       gzip: true,
       metadata: {
         cacheControl: 'public, max-age=31536000',
@@ -54,5 +53,10 @@ const fetch = require('node-fetch');
     });
 
     fs.unlink(coverLocalPath, emptyHandle);
+    await Card.findByIdAndUpdate(card.id, {
+      $set: {
+        coverPath: coverRemotePath,
+      },
+    });
   });
 })();
