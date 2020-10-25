@@ -1635,8 +1635,8 @@ module.exports = class SocketIoSession {
     this.cardsCost = null;
   }
 
-  async onClWebCardDraw({cardPoolId, packInd}) {
-    debug('  onClWebCardDraw', cardPoolId, packInd);
+  async onClWebCardDraw({cardPoolId, packIndex}) {
+    debug('  onClWebCardDraw', cardPoolId, packIndex);
 
     const cardPool = await CardPool.findById(cardPoolId);
     if (!cardPool) throw codeError(0, 'not found');
@@ -1658,23 +1658,24 @@ module.exports = class SocketIoSession {
     });
 
     const res = [];
-    if (packInd > cardPool.packs.length) throw codeError(2, 'bad request');
+    if (packIndex > cardPool.packs.length) throw codeError(2, 'bad request');
     if (cardRates.length == 0) return [];
 
-    let currSum = cardRates[0];
+    let currSum = 0;
     const acc = [];
     cardRates.forEach((x) => {
-      acc.push(currSum);
       currSum += x;
+      acc.push(currSum);
     });
 
-    for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
+    for (let i = 0; i < cardPool.packs[packIndex].cardNum; i++) {
       const targetIndex = binarySearch(acc);
       const card = await Card.findById(cardIndex[targetIndex]);
+      if (!card) throw codeError(3, 'card not found');
       res.push(card);
     }
     this.cards = res;
-    this.cardsCost = cardPool.packs[packInd].cost;
+    this.cardsCost = cardPool.packs[packIndex].cost;
 
     return res.map((x) => serializeCard(x));
   }
@@ -1683,7 +1684,7 @@ module.exports = class SocketIoSession {
 function binarySearch(acc) {
   const targetDist = Math.random();
   let low = 0;
-  let high = acc.length;
+  let high = acc.length - 1;
   while (low < high) {
     const mid = parseInt(low + (high - low) / 2);
     const distance = acc[mid];
