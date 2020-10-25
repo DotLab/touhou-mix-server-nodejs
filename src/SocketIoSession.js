@@ -36,6 +36,7 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
+  UserHasCard,
 } = require('./models');
 const {NAME_ARTIFACT, UI_APP, UI_WEB} = require('./TranslationService');
 
@@ -129,6 +130,8 @@ module.exports = class SocketIoSession {
     this.pendingCode = null;
     this.sessionToken = null;
     this.sessionRecord = null;
+    this.cards = null;
+    this.cardsCost = null;
 
     socket.on('cl_handshake', this.onClHandshake.bind(this));
     socket.on('disconnect', this.onDisconnect.bind(this));
@@ -273,6 +276,9 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
+
+    this.socket.on('ClWebCardDrawConfirm', createRpcHandler(this.onClWebCardDrawConfirm.bind(this)));
+    this.socket.on('ClWebCardDraw', createRpcHandler(this.onClWebCardDraw.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1458,22 +1464,22 @@ module.exports = class SocketIoSession {
     switch (type) {
       case 'portrait':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          portraitPath: paths.path,
+          portraitPath: paths.coverPath,
         }}, {new: true});
         break;
       case 'cover':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          coverPath: paths.path,
+          coverPath: paths.coverPath,
         }}, {new: true});
         break;
       case 'background':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          backgroundPath: paths.path,
+          backgroundPath: paths.coverPath,
         }}, {new: true});
         break;
       case 'icon':
         card = await Card.findByIdAndUpdate(id, {$set: {
-          iconPath: paths.path,
+          iconPath: paths.coverPath,
         }}, {new: true});
         break;
     }
@@ -1563,7 +1569,7 @@ module.exports = class SocketIoSession {
       name, desc, group, packs,
     } = update;
 
-    if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!this.checkUserRole(ROLE_CARD_MOD)) throw codeError(0, ERROR_FORBIDDEN);
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
 
     let cardPool = await CardPool.findById(id);
@@ -1573,7 +1579,7 @@ module.exports = class SocketIoSession {
     let cardId = null;
     if (group) {
       group = group.map((x) => ({name: x.name, weight: parseFloat(x.weight), cards: x.cards}));
-      for (let i = group.length - 1; i >= 0; i--) {
+      for (let i = 0; i < group.length; i++) {
         if (group[i].cards.length > 0) {
           cardId = group[i].cards[0].cardId;
           break;
@@ -1616,4 +1622,71 @@ module.exports = class SocketIoSession {
     ]);
     return res;
   }
+
+  async onClWebCardDrawConfirm() {
+    debug('  onClWebCardDrawConfirm');
+    if (!this.cards || !this.cardsCost) throw codeError(1, 'internal error');
+    if (!this.user.gold || this.user.gold < this.cardsCost) throw codeError(1, 'not enough gold');
+    await User.updateOne({_id: this.user.id}, {$inc: {gold: -this.cardsCost}});
+    for (let i = 0; i < this.cards.length; i++) {
+      await UserHasCard.create({userId: this.user.id, cardId: this.cards[i].id, date: new Date()});
+    }
+    this.cards = null;
+    this.cardsCost = null;
+  }
+
+  async onClWebCardDraw({cardPoolId, packInd}) {
+    debug('  onClWebCardDraw', cardPoolId, packInd);
+
+    const cardPool = await CardPool.findById(cardPoolId);
+    if (!cardPool) throw codeError(0, 'not found');
+    if (!this.user) throw codeError(1, ERROR_FORBIDDEN);
+
+    const cardWeights = [];
+    const cardWeightSums = [];
+    const groupWeights = [];
+    const groupWeightSum = cardPool.group.reduce((acc, cur) => acc + parseFloat(cur.weight), 0);
+    const cardIndex = [];
+
+    cardPool.group.forEach((x, i) => {
+      cardWeightSums.push(x.cards.reduce((acc, cur) => acc + parseFloat(cur.weight), 0));
+      groupWeights.push(x.weight);
+      x.cards.forEach((y) =>{
+        cardWeights.push(y.weight / cardWeightSums[i] * groupWeights[i] / groupWeightSum);
+        cardIndex.push(y.cardId);
+      });
+    });
+
+    const res = [];
+    if (packInd > cardPool.packs.length) throw codeError(2, 'bad request');
+    if (cardWeights.length == 0) return [];
+
+    for (let i = 0; i < cardPool.packs[packInd].cardNum; i++) {
+      const targetIndex = binarySearch(cardWeights);
+      const card = await Card.findById(cardIndex[targetIndex]);
+      res.push(card);
+    }
+    this.cards = res;
+    this.cardsCost = cardPool.packs[packInd].cost;
+
+    return res.map((x) => serializeCard(x));
+  }
 };
+
+function binarySearch(arr) {
+  let c = 0;
+  const acc = arr.map((x) => {
+    return c += x;
+  });
+  const targetDist = Math.random();
+  let low = 0;
+  let high = arr.length;
+  while (low < high) {
+    const mid = parseInt(low + (high - low) / 2);
+    const distance = acc[mid];
+    if (distance < targetDist) low = mid + 1;
+    else if (distance > targetDist) high = mid;
+    else return mid;
+  }
+  return low;
+}

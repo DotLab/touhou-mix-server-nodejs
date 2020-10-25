@@ -924,7 +924,7 @@ exports.CardPool = mongoose.model('CardPool', new mongoose.Schema({
 
 exports.serializeCardPool = function(CardPool) {
   let {
-    _id,
+    _id, creatorId,
     date, name, desc, group,
     creator, coverPath, packs,
   } = CardPool;
@@ -935,7 +935,7 @@ exports.serializeCardPool = function(CardPool) {
   group = group.map((x) => ({name: x.name, weight: x.weight, cards: x.cards.map((y) => (exports.serializeCard(y)))}));
 
   return {
-    id: _id,
+    id: _id, creatorId,
     date, name, desc, group,
     creator, coverUrl: BUCKET_URL + coverPath, packs,
   };
