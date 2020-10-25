@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const debug = require('debug')('thmix:models');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Schema.Types.ObjectId;
+const Mixed = mongoose.Schema.Types.Mixed;
 const {ROLE_MIDI_MOD, ROLE_SITE_OWNER, checkUserRole} = require('./services/RoleService');
 
 const BUCKET_URL = 'https://storage.thmix.org';
@@ -447,6 +448,8 @@ exports.DocComment = mongoose.model('DocComment', new mongoose.Schema({
 
   text: String,
   date: Date,
+  // MidiComment: {trialId: ObjectId, trialGrade: String, trialPerformance: Number}
+  data: Mixed,
 }, {collection: 'docComments'}));
 
 exports.serializeDocComment = function(doc) {
@@ -454,13 +457,14 @@ exports.serializeDocComment = function(doc) {
     _id,
     docId,
     userId, userName, userAvatarPath,
-    text, date,
+    text, date, data,
   } = doc;
   return {
     _id,
     docId,
-    userId, userName, userAvatarPath, userAvatarUrl: BUCKET_URL + userAvatarPath,
-    text, date,
+    userId, userName,
+    userAvatarPath, userAvatarUrl: userAvatarPath && BUCKET_URL + userAvatarPath,
+    text, date, data,
   };
 };
 
