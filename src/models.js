@@ -972,14 +972,14 @@ exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
 
 exports.serializeRanking = function(user) {
   const {
-    id,
+    _id,
     name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, avgCombo, avgAccuracy,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
-    id,
+    id: _id,
     name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo,
     avgCombo, avgAccuracy,
