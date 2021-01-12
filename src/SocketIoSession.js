@@ -36,6 +36,7 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
+  serializeRanking,
 } = require('./models');
 const {NAME_ARTIFACT, UI_APP, UI_WEB} = require('./TranslationService');
 
@@ -420,18 +421,47 @@ module.exports = class SocketIoSession {
     success(done, serializeUser(user));
   }
 
-  async onClWebUserList({page}, done) {
-    debug('  onClWebUserList', page);
+  async onClWebUserList({page, year}, done) {
+    debug('  onClWebUserList', page, year);
 
     if (!(page > 0)) page = 0; // filter null and undefined
 
-    const users = await User.find()
-        .sort('-performance -score')
-        .skip(page * USER_LIST_PAGE_LIMIT)
-        .limit(USER_LIST_PAGE_LIMIT);
-    if (!users) return error(done, 'not found');
+    const pipeline = [];
+    if (!year) {
+      pipeline.push({$match: {withdrew: false}});
+    } else {
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year + 1, 0, 1);
+      pipeline.push({$match: {$and: [{withdrew: false, date: {$gte: startDate, $lte: endDate}}]}});
+    }
 
-    success(done, users.map((user) => serializeUser(user)));
+    pipeline.push({$group: {
+      _id: '$userId',
+      playTime: {$sum: '$duration'},
+      trialCount: {$sum: 1},
+      score: {$sum: '$score'},
+      avgCombo: {$avg: '$combo'},
+      avgAccuracy: {$avg: '$accuracy'},
+      performance: {$sum: '$performance'},
+    }});
+    pipeline.push({$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}});
+    pipeline.push({$unwind: {path: '$user', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$addFields: {
+      'user.playTime': '$playTime',
+      'user.trialCount': '$trialCount',
+      'user.score': '$score',
+      'user.avgCombo': '$avgCombo',
+      'user.avgAccuracy': '$avgAccuracy',
+      'user.performance': '$performance',
+    }});
+    pipeline.push({$replaceRoot: {newRoot: '$user'}});
+    pipeline.push({$sort: {performance: -1}});
+    pipeline.push({$skip: page * USER_LIST_PAGE_LIMIT});
+    pipeline.push({$limit: USER_LIST_PAGE_LIMIT});
+
+    const rankings = await Trial.aggregate(pipeline);
+
+    success(done, rankings.map((x) => serializeRanking(x) ));
   }
 
   async onClWebUserUpdateBio({bio}, done) {
