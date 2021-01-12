@@ -196,6 +196,7 @@ const MidiSchema = new mongoose.Schema({
   cCount: Number,
   dCount: Number,
   fCount: Number,
+  wCount: Number,
 });
 MidiSchema.index({
   uploaderName: 'text',
@@ -234,7 +235,7 @@ exports.serializeMidi = function(midi, context) {
     trialCount, downloadCount, loveCount, voteCount, voteSum,
     score, combo, accuracy,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
-    sCount, aCount, bCount, cCount, dCount, fCount,
+    sCount, aCount, bCount, cCount, dCount, fCount, wCount,
     hash,
   } = midi;
   if (author) {
@@ -266,6 +267,7 @@ exports.serializeMidi = function(midi, context) {
   cCount = cCount || 0;
   dCount = dCount || 0;
   fCount = fCount || 0;
+  fCount = wCount || 0;
   return {
     _id,
     id: _id,
@@ -286,7 +288,7 @@ exports.serializeMidi = function(midi, context) {
     avgScore: !trialCount ? 0 : score / trialCount, avgCombo: !trialCount ? 0 : combo / trialCount, avgAccuracy: !trialCount ? 0 : accuracy / trialCount,
     passCount: trialCount - fCount, failCount: fCount,
     sCutoff, aCutoff, bCutoff, cCutoff, dCutoff,
-    sCount, aCount, bCount, cCount, dCount, fCount,
+    sCount, aCount, bCount, cCount, dCount, fCount, wCount,
     hash,
   };
 };
