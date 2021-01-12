@@ -58,7 +58,7 @@ exports.serializeUser = function(user) {
     name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
-    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount, yearPerformance,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
   } = user;
   return {
     id,
@@ -67,7 +67,7 @@ exports.serializeUser = function(user) {
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
-    passCount: trialCount - fCount, failCount: fCount, yearPerformance,
+    passCount: trialCount - fCount, failCount: fCount,
   };
 };
 
@@ -969,3 +969,21 @@ exports.UserHasCard = mongoose.model('UserHasCard', new mongoose.Schema({
   cardId: ObjectId,
   date: Date,
 }, {collection: 'userHasCards'}));
+
+exports.serializeRanking = function(user) {
+  const {
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
+    trialCount, score, combo, avgCombo, avgAccuracy,
+    playTime, onlineTime,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
+  } = user;
+  return {
+    id,
+    name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
+    trialCount, score, combo,
+    avgCombo, avgAccuracy,
+    playTime, onlineTime,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
+  };
+};

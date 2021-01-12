@@ -36,6 +36,7 @@ const {
   ErrorReport, serializeErrorReport,
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
+  serializeRanking,
 } = require('./models');
 const {NAME_ARTIFACT, UI_APP, UI_WEB} = require('./TranslationService');
 
@@ -424,35 +425,43 @@ module.exports = class SocketIoSession {
     debug('  onClWebUserList', page, year);
 
     if (!(page > 0)) page = 0; // filter null and undefined
-    if (!year) {
-      const users = await User.find()
-          .sort('-performance -score')
-          .skip(page * USER_LIST_PAGE_LIMIT)
-          .limit(USER_LIST_PAGE_LIMIT);
-      if (!users) return error(done, 'not found');
 
-      success(done, users.map((user) => serializeUser(user)));
+    const pipeline = [];
+    if (!year) {
+      pipeline.push({$match: {withdrew: false}});
+    } else {
+      const startDate = new Date(year, 0, 1);
+      const endDate = new Date(year, 11, 31, 23, 59, 59);
+      pipeline.push({$match: {$and: [{withdrew: false, date: {$gte: startDate, $lte: endDate}}]}});
     }
 
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year, 11, 31, 23, 59, 59);
+    pipeline.push({$group: {
+      _id: '$userId',
+      playTime: {$sum: '$duration'},
+      trialCount: {$sum: 1},
+      score: {$sum: '$score'},
+      avgCombo: {$avg: '$combo'},
+      avgAccuracy: {$avg: '$accuracy'},
+      performance: {$sum: '$performance'},
+    }});
+    pipeline.push({$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}});
+    pipeline.push({$unwind: {path: '$user', preserveNullAndEmptyArrays: true}});
+    pipeline.push({$addFields: {
+      'user.playTime': '$playTime',
+      'user.trialCount': '$trialCount',
+      'user.score': '$score',
+      'user.avgCombo': '$avgCombo',
+      'user.avgAccuracy': '$avgAccuracy',
+      'user.performance': '$performance',
+    }});
+    pipeline.push({$replaceRoot: {newRoot: '$user'}});
+    pipeline.push({$sort: {performance: -1}});
+    pipeline.push({$skip: page * USER_LIST_PAGE_LIMIT});
+    pipeline.push({$limit: USER_LIST_PAGE_LIMIT});
 
-    const rankings = await Trial.aggregate([
-      {$match: {$and: [{withdrew: false, date: {$gte: startDate, $lte: endDate}}]}},
-      {$group: {
-        _id: '$userId',
-        yearPerformance: {$sum: '$performance'},
-      }},
-      {$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}},
-      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
-      {$addFields: {'user.yearPerformance': '$yearPerformance'}},
-      {$replaceRoot: {newRoot: '$user'}},
-      {$sort: {yearPerformance: -1}},
-      {$skip: page * USER_LIST_PAGE_LIMIT},
-      {$limit: USER_LIST_PAGE_LIMIT},
-    ]);
+    const rankings = await Trial.aggregate(pipeline);
 
-    success(done, rankings.map((x) => serializeUser(x) ));
+    success(done, rankings.map((x) => serializeRanking(x) ));
   }
 
   async onClWebUserUpdateBio({bio}, done) {
