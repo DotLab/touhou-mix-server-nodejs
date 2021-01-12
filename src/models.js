@@ -267,7 +267,7 @@ exports.serializeMidi = function(midi, context) {
   cCount = cCount || 0;
   dCount = dCount || 0;
   fCount = fCount || 0;
-  fCount = wCount || 0;
+  wCount = wCount || 0;
   return {
     _id,
     id: _id,
