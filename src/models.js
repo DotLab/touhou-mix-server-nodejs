@@ -58,7 +58,7 @@ exports.serializeUser = function(user) {
     name, joinedDate, seenDate, bio, avatarUrl, roles, isAnon, deviceId,
     trialCount, score, combo, accuracy,
     playTime, onlineTime,
-    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
+    performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount, yearPerformance,
   } = user;
   return {
     id,
@@ -67,7 +67,7 @@ exports.serializeUser = function(user) {
     avgScore: score / trialCount, avgCombo: combo / trialCount, avgAccuracy: accuracy / trialCount,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
-    passCount: trialCount - fCount, failCount: fCount,
+    passCount: trialCount - fCount, failCount: fCount, yearPerformance,
   };
 };
 

@@ -420,18 +420,39 @@ module.exports = class SocketIoSession {
     success(done, serializeUser(user));
   }
 
-  async onClWebUserList({page}, done) {
-    debug('  onClWebUserList', page);
+  async onClWebUserList({page, year}, done) {
+    debug('  onClWebUserList', page, year);
 
     if (!(page > 0)) page = 0; // filter null and undefined
+    if (!year) {
+      const users = await User.find()
+          .sort('-performance -score')
+          .skip(page * USER_LIST_PAGE_LIMIT)
+          .limit(USER_LIST_PAGE_LIMIT);
+      if (!users) return error(done, 'not found');
 
-    const users = await User.find()
-        .sort('-performance -score')
-        .skip(page * USER_LIST_PAGE_LIMIT)
-        .limit(USER_LIST_PAGE_LIMIT);
-    if (!users) return error(done, 'not found');
+      success(done, users.map((user) => serializeUser(user)));
+    }
 
-    success(done, users.map((user) => serializeUser(user)));
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year, 11, 31, 23, 59, 59);
+
+    const rankings = await Trial.aggregate([
+      {$match: {$and: [{withdrew: false, date: {$gte: startDate, $lte: endDate}}]}},
+      {$group: {
+        _id: '$userId',
+        yearPerformance: {$sum: '$performance'},
+      }},
+      {$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
+      {$addFields: {'user.yearPerformance': '$yearPerformance'}},
+      {$replaceRoot: {newRoot: '$user'}},
+      {$sort: {yearPerformance: -1}},
+      {$skip: page * USER_LIST_PAGE_LIMIT},
+      {$limit: USER_LIST_PAGE_LIMIT},
+    ]);
+
+    success(done, rankings.map((x) => serializeUser(x) ));
   }
 
   async onClWebUserUpdateBio({bio}, done) {
