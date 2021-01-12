@@ -431,7 +431,7 @@ module.exports = class SocketIoSession {
       pipeline.push({$match: {withdrew: false}});
     } else {
       const startDate = new Date(year, 0, 1);
-      const endDate = new Date(year, 11, 31, 23, 59, 59);
+      const endDate = new Date(year + 1, 0, 1);
       pipeline.push({$match: {$and: [{withdrew: false, date: {$gte: startDate, $lte: endDate}}]}});
     }
 
