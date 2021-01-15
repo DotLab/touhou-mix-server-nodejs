@@ -407,7 +407,7 @@ module.exports = class WebSocketSession {
     let eventId = undefined;
     if (!withdrew) {
       const eventIds = await Event.aggregate([
-        {$match: {$and: [{startDate: {$lte: new Date()}, endDate: {$gte: new Date()}}]}},
+        {$match: {startDate: {$lte: new Date()}, endDate: {$gte: new Date()}}},
         {$project: {midiIds: 1}},
         {$unwind: {path: '$midiIds', preserveNullAndEmptyArrays: true}},
         {$match: {midiIds: new ObjectId(midi._id)}},

@@ -1742,7 +1742,8 @@ module.exports = class SocketIoSession {
     const event = await Event.findById(id);
     if (!event) throw codeError(0, 'not found');
 
-    const pipeline = [{$match: {$and: [{withdrew: false, eventId: new ObjectId(id), date: {$gte: event.startDate, $lte: event.endDate}}]}},
+    const pipeline = [
+      {$match: {withdrew: false, eventId: new ObjectId(id), date: {$gte: event.startDate, $lte: event.endDate}}},
       {$group: {
         _id: '$userId',
         playTime: {$sum: '$duration'},
@@ -1770,7 +1771,7 @@ module.exports = class SocketIoSession {
 
     if (!this.user) return rankings.map((x) => serializeRanking(x));
 
-    pipeline[0] = {$match: {$and: [{withdrew: false, userId: new ObjectId(this.user.id), eventId: new ObjectId(id)}]}};
+    pipeline[0] = {$match: {withdrew: false, userId: new ObjectId(this.user.id), eventId: new ObjectId(id)}};
     let user = await Trial.aggregate(pipeline);
     user = user[0];
 
