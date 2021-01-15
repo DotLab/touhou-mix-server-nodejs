@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 const debug = require('debug')('thmix:WebSocketSession');
 const {
   UI_APP,
@@ -16,6 +18,7 @@ const {
   SessionRecord,
   SessionToken, genSessionTokenHash,
   ErrorReport,
+  Event,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
 const {midiController, commentController} = require('./controllers');
@@ -401,10 +404,22 @@ module.exports = class WebSocketSession {
       accuracy,
     };
 
+    let eventId = undefined;
     if (!withdrew) {
+      const eventIds = await Event.aggregate([
+        {$match: {startDate: {$lte: new Date()}, endDate: {$gte: new Date()}}},
+        {$project: {midiIds: 1}},
+        {$unwind: {path: '$midiIds', preserveNullAndEmptyArrays: true}},
+        {$match: {midiIds: new ObjectId(midi._id)}},
+      ]);
+      if (eventIds[0]) {
+        eventId = eventIds[0]._id;
+        $inc.gold += gold;
+      }
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
     }
+
     this.user = await this.updateUser({$inc: {
       playTime: duration,
     }});
@@ -420,6 +435,7 @@ module.exports = class WebSocketSession {
       duration,
 
       version,
+      eventId,
     });
 
     this.returnSuccess(id);

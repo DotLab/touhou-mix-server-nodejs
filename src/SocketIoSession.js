@@ -15,6 +15,7 @@ const {
   ROLE_MIDI_ADMIN,
   ROLE_CARD_MOD,
   ROLE_CARDPOOL_MOD,
+  ROLE_EVENT_MOD,
   ROLE_TRANSLATION_MOD,
   ROLE_SITE_OWNER,
   checkUserRole,
@@ -37,6 +38,7 @@ const {
   Card, createDefaultCard, serializeCard,
   CardPool, createDefaultCardPool, serializeCardPool,
   serializeRanking,
+  Event, createDefaultEvent, serializeEvent,
 } = require('./models');
 const {NAME_ARTIFACT, UI_APP, UI_WEB} = require('./TranslationService');
 
@@ -110,6 +112,8 @@ const CARD_COVER_HEIGHT = 200;
 const CARD_COVER_WIDTH = 150;
 const COVER_HEIGHT = 250;
 const COVER_WIDTH = 900;
+const EVENT_COVER_HEIGHT = 600;
+const EVENT_COVER_WIDTH = 900;
 
 module.exports = class SocketIoSession {
   /**
@@ -274,6 +278,13 @@ module.exports = class SocketIoSession {
     this.socket.on('ClWebCardPoolGet', createRpcHandler(this.onClWebCardPoolGet.bind(this)));
     this.socket.on('ClWebCardPoolUpdate', createRpcHandler(this.onClWebCardPoolUpdate.bind(this)));
     this.socket.on('ClWebCardPoolList', createRpcHandler(this.onClWebCardPoolList.bind(this)));
+
+    this.socket.on('ClWebEventCreate', createRpcHandler(this.onClWebEventCreate.bind(this)));
+    this.socket.on('ClWebEventGet', createRpcHandler(this.onClWebEventGet.bind(this)));
+    this.socket.on('ClWebEventGetMidiList', createRpcHandler(this.onClWebEventGetMidiList.bind(this)));
+    this.socket.on('ClWebEventUploadCover', createRpcHandler(this.onClWebEventUploadCover.bind(this)));
+    this.socket.on('ClWebEventUpdate', createRpcHandler(this.onClWebEventUpdate.bind(this)));
+    this.socket.on('ClWebEventRanking', createRpcHandler(this.onClWebEventRanking.bind(this)));
 
     this.socket.on('cl_web_person_create', this.onClWebPersonCreate.bind(this));
     this.socket.on('cl_web_person_get', this.onClWebPersonGet.bind(this));
@@ -1645,5 +1656,128 @@ module.exports = class SocketIoSession {
       {$group: {_id: '$sourceAlbumName', songs: {$push: {_id: '$_id', midiIds: '$midiIds'}}}},
     ]);
     return res;
+  }
+
+  async onClWebEventCreate() {
+    debug('  onClWebEventCreate');
+
+    if (!this.checkUserRole(ROLE_EVENT_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const event = await Event.create({
+      ...createDefaultEvent(),
+    });
+    return {id: event.id};
+  }
+
+  async onClWebEventGet({id}) {
+    debug('  onClWebEventGet', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const event = await Event.findById(id);
+    if (!event) throw codeError(1, 'not found');
+
+    return serializeEvent(event);
+  }
+
+  async onClWebEventGetMidiList({id}) {
+    debug('  onClWebEventGetMidiList', id);
+
+    if (!verifyObjectId(id)) throw codeError(0, 'not found');
+
+    const event = await Event.aggregate([
+      {$match: {_id: new ObjectId(id)}},
+      {$lookup: {from: 'midis', localField: 'midiIds', foreignField: '_id', as: 'midis'}},
+    ]);
+
+    if (!event) throw codeError(1, 'not found');
+
+    return serializeEvent(event[0]);
+  }
+
+  async onClWebEventUploadCover({id, size, buffer}) {
+    debug('  onClWebEventUploadCover', id, size, buffer.length);
+
+    if (!this.checkUserRole(ROLE_EVENT_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+    if (size !== buffer.length) throw codeError(2, 'tampering with api');
+    if (size > 5 * MB) throw codeError(3, 'too large');
+
+    let event = await Event.findById(id);
+    if (!event) throw codeError(4, 'not found');
+
+    const paths = await this.uploadCover(buffer, EVENT_COVER_HEIGHT, EVENT_COVER_WIDTH);
+
+    event = await Event.findByIdAndUpdate(id, {$set: {
+      coverPath: paths.coverPath,
+    }}, {new: true});
+
+    return serializeEvent(event);
+  }
+
+  async onClWebEventUpdate(update) {
+    debug('  onClWebEventUpdate');
+    if (!this.checkUserRole(ROLE_EVENT_MOD)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const {
+      id, startDate, endDate, name, desc, midiIds,
+    } = update;
+
+    if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
+
+    let event = await Event.findById(id);
+    if (!event) throw codeError(2, 'not found');
+
+    update = filterUndefinedKeys({
+      startDate, endDate, name, desc, midiIds,
+    });
+
+    event = await Event.findByIdAndUpdate(id, {$set: update}, {new: true});
+    return serializeEvent(event);
+  }
+
+  async onClWebEventRanking({id}) {
+    debug('  onClWebEventRanking', id);
+
+    const event = await Event.findById(id);
+    if (!event) throw codeError(0, 'not found');
+
+    const pipeline = [
+      {$match: {withdrew: false, eventId: new ObjectId(id), date: {$gte: event.startDate, $lte: event.endDate}}},
+      {$group: {
+        _id: '$userId',
+        playTime: {$sum: '$duration'},
+        trialCount: {$sum: 1},
+        score: {$sum: '$score'},
+        avgCombo: {$avg: '$combo'},
+        avgAccuracy: {$avg: '$accuracy'},
+        performance: {$sum: '$performance'},
+      }},
+      {$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
+      {$addFields: {
+        'user.playTime': '$playTime',
+        'user.trialCount': '$trialCount',
+        'user.score': '$score',
+        'user.avgCombo': '$avgCombo',
+        'user.avgAccuracy': '$avgAccuracy',
+        'user.performance': '$performance',
+      }},
+      {$replaceRoot: {newRoot: '$user'}},
+      {$sort: {performance: -1}},
+    ];
+
+    const rankings = await Trial.aggregate(pipeline);
+
+    if (!this.user) return rankings.map((x) => serializeRanking(x));
+
+    pipeline[0] = {$match: {withdrew: false, userId: new ObjectId(this.user.id), eventId: new ObjectId(id)}};
+    let user = await Trial.aggregate(pipeline);
+    user = user[0];
+
+    if (!user) return {rankings: rankings.map((x) => serializeRanking(x)), userRanking: -1};
+
+    const userRanking = rankings.findIndex((x) => x._id.equals(user._id));
+    return {rankings: rankings.map((x) => serializeRanking(x)), userRanking, userRankingDetail: serializeRanking(user)};
   }
 };
