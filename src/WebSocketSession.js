@@ -414,14 +414,15 @@ module.exports = class WebSocketSession {
         {$match: {midiIds: new ObjectId(midi._id)}},
       ]);
 
-      if (eventIds) eventId = eventIds[0];
+      if (eventIds[0]) {
+        eventId = eventIds[0]._id;
+        await User.updateOne({_id: this.user.id}, {$inc: {gold: Math.ceil(performance)}});
+      }
 
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
-      if (eventId) {
-        await User.updateOne({_id: this.user.id}, {$inc: {gold: Math.ceil(performance)}});
-      }
     }
+
     this.user = await this.updateUser({$inc: {
       playTime: duration,
     }});
