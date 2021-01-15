@@ -405,7 +405,6 @@ module.exports = class WebSocketSession {
     };
 
     let eventId = undefined;
-
     if (!withdrew) {
       const eventIds = await Event.aggregate([
         {$match: {$and: [{startDate: {$lte: new Date()}, endDate: {$gte: new Date()}}]}},
@@ -413,7 +412,6 @@ module.exports = class WebSocketSession {
         {$unwind: {path: '$midiIds', preserveNullAndEmptyArrays: true}},
         {$match: {midiIds: new ObjectId(midi._id)}},
       ]);
-
       if (eventIds[0]) {
         eventId = eventIds[0]._id;
         await User.updateOne({_id: this.user.id}, {$inc: {gold: Math.ceil(performance)}});
