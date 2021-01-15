@@ -416,7 +416,6 @@ module.exports = class WebSocketSession {
         eventId = eventIds[0]._id;
         $inc.gold += gold;
       }
-
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
     }

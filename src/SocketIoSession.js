@@ -1742,30 +1742,29 @@ module.exports = class SocketIoSession {
     const event = await Event.findById(id);
     if (!event) throw codeError(0, 'not found');
 
-    const pipeline = [];
-
-    pipeline.push({$match: {$and: [{withdrew: false, eventId: new ObjectId(id), date: {$gte: event.startDate, $lte: event.endDate}}]}});
-    pipeline.push({$group: {
-      _id: '$userId',
-      playTime: {$sum: '$duration'},
-      trialCount: {$sum: 1},
-      score: {$sum: '$score'},
-      avgCombo: {$avg: '$combo'},
-      avgAccuracy: {$avg: '$accuracy'},
-      performance: {$sum: '$performance'},
-    }});
-    pipeline.push({$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}});
-    pipeline.push({$unwind: {path: '$user', preserveNullAndEmptyArrays: true}});
-    pipeline.push({$addFields: {
-      'user.playTime': '$playTime',
-      'user.trialCount': '$trialCount',
-      'user.score': '$score',
-      'user.avgCombo': '$avgCombo',
-      'user.avgAccuracy': '$avgAccuracy',
-      'user.performance': '$performance',
-    }});
-    pipeline.push({$replaceRoot: {newRoot: '$user'}});
-    pipeline.push({$sort: {performance: -1}});
+    const pipeline = [{$match: {$and: [{withdrew: false, eventId: new ObjectId(id), date: {$gte: event.startDate, $lte: event.endDate}}]}},
+      {$group: {
+        _id: '$userId',
+        playTime: {$sum: '$duration'},
+        trialCount: {$sum: 1},
+        score: {$sum: '$score'},
+        avgCombo: {$avg: '$combo'},
+        avgAccuracy: {$avg: '$accuracy'},
+        performance: {$sum: '$performance'},
+      }},
+      {$lookup: {from: 'users', localField: '_id', foreignField: '_id', as: 'user'}},
+      {$unwind: {path: '$user', preserveNullAndEmptyArrays: true}},
+      {$addFields: {
+        'user.playTime': '$playTime',
+        'user.trialCount': '$trialCount',
+        'user.score': '$score',
+        'user.avgCombo': '$avgCombo',
+        'user.avgAccuracy': '$avgAccuracy',
+        'user.performance': '$performance',
+      }},
+      {$replaceRoot: {newRoot: '$user'}},
+      {$sort: {performance: -1}},
+    ];
 
     const rankings = await Trial.aggregate(pipeline);
 
