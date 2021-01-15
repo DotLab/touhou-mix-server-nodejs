@@ -414,7 +414,7 @@ module.exports = class WebSocketSession {
       ]);
       if (eventIds[0]) {
         eventId = eventIds[0]._id;
-        await User.updateOne({_id: this.user.id}, {$inc: {gold: Math.ceil(performance)}});
+        $inc.gold += gold;
       }
 
       this.user = await this.updateUser({$inc});
