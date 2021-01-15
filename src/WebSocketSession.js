@@ -16,6 +16,7 @@ const {
   SessionRecord,
   SessionToken, genSessionTokenHash,
   ErrorReport,
+  Event,
 } = require('./models');
 const {getTimeBetween} = require('./utils');
 const {midiController, commentController} = require('./controllers');
@@ -401,9 +402,22 @@ module.exports = class WebSocketSession {
       accuracy,
     };
 
+    let eventId = '';
+    const activeEvents = await Event.aggregate([
+      {$match: {active: true}},
+      {$project: {midiIds: 1}},
+    ]);
+    // if not widthdrew and midi played is event midi
+    if (!withdrew && activeEvents[0].midiIds.findIndex((x) => x.equals(midi._id)) !== -1) {
+      eventId = activeEvents[0]._id;
+    }
+
     if (!withdrew) {
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
+      if (eventId) {
+        await User.updateOne({_id: this.user.id}, {$inc: {gold: Math.ceil(performance)}});
+      }
     }
     this.user = await this.updateUser({$inc: {
       playTime: duration,
@@ -420,6 +434,7 @@ module.exports = class WebSocketSession {
       duration,
 
       version,
+      eventId,
     });
 
     this.returnSuccess(id);
