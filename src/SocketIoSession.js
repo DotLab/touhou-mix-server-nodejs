@@ -1720,7 +1720,7 @@ module.exports = class SocketIoSession {
     if (!this.checkUserRole(ROLE_EVENT_MOD)) throw codeError(0, ERROR_FORBIDDEN);
 
     const {
-      id, startDate, endDate, name, desc, midiIds, active,
+      id, startDate, endDate, name, desc, midiIds,
     } = update;
 
     if (!verifyObjectId(id)) throw codeError(1, ERROR_FORBIDDEN);
@@ -1729,7 +1729,7 @@ module.exports = class SocketIoSession {
     if (!event) throw codeError(2, 'not found');
 
     update = filterUndefinedKeys({
-      startDate, endDate, name, desc, midiIds, active,
+      startDate, endDate, name, desc, midiIds,
     });
 
     event = await Event.findByIdAndUpdate(id, {$set: update}, {new: true});

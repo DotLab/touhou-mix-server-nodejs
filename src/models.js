@@ -996,19 +996,18 @@ exports.Event = mongoose.model('Event', new mongoose.Schema({
   name: String,
   desc: String,
   midiIds: [ObjectId],
-  active: Boolean,
   coverPath: String,
 }));
 
 exports.serializeEvent = function(Event) {
   const {
     _id,
-    startDate, endDate, name, desc, midiIds, active, coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverPath, midis,
   } = Event;
 
   return {
     id: _id,
-    startDate, endDate, name, desc, midiIds, active, coverUrl: BUCKET_URL + coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath, midis,
   };
 };
 
@@ -1019,7 +1018,6 @@ exports.createDefaultEvent = function() {
     name: '',
     desc: '',
     midiIds: [],
-    active: false,
     coverPath: '',
   };
 };

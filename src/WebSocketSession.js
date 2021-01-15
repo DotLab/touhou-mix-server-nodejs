@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 const debug = require('debug')('thmix:WebSocketSession');
 const {
   UI_APP,
@@ -402,17 +404,18 @@ module.exports = class WebSocketSession {
       accuracy,
     };
 
-    let eventId = '';
-    const activeEvents = await Event.aggregate([
-      {$match: {active: true}},
-      {$project: {midiIds: 1}},
-    ]);
-    // if not widthdrew and midi played is event midi
-    if (!withdrew && activeEvents[0].midiIds.findIndex((x) => x.equals(midi._id)) !== -1) {
-      eventId = activeEvents[0]._id;
-    }
+    let eventId = undefined;
 
     if (!withdrew) {
+      const eventIds = await Event.aggregate([
+        {$match: {$and: [{startDate: {$lte: new Date()}, endDate: {$gte: new Date()}}]}},
+        {$project: {midiIds: 1}},
+        {$unwind: {path: '$midiIds', preserveNullAndEmptyArrays: true}},
+        {$match: {midiIds: new ObjectId(midi._id)}},
+      ]);
+
+      if (eventIds) eventId = eventIds[0];
+
       this.user = await this.updateUser({$inc});
       midi = await Midi.findOneAndUpdate({hash}, {$inc});
       if (eventId) {
