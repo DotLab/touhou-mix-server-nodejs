@@ -1685,14 +1685,19 @@ module.exports = class SocketIoSession {
 
     if (!verifyObjectId(id)) throw codeError(0, 'not found');
 
-    const event = await Event.aggregate([
+    const eventMidis = await Event.aggregate([
       {$match: {_id: new ObjectId(id)}},
       {$lookup: {from: 'midis', localField: 'midiIds', foreignField: '_id', as: 'midis'}},
+      {$unwind: {path: '$midis', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'songs', localField: 'midis.songId', foreignField: '_id', as: 'midis.song'}},
+      {$unwind: {path: '$midis.song', preserveNullAndEmptyArrays: true}},
+      {$lookup: {from: 'albums', localField: 'midis.song.albumId', foreignField: '_id', as: 'midis.album'}},
+      {$unwind: {path: '$midis.album', preserveNullAndEmptyArrays: true}},
+      {$replaceRoot: {newRoot: '$midis'}},
     ]);
+    if (!eventMidis) throw codeError(1, 'not found');
 
-    if (!event) throw codeError(1, 'not found');
-
-    return serializeEvent(event[0]);
+    return eventMidis.map((x) => serializeMidi(x));
   }
 
   async onClWebEventUploadCover({id, size, buffer}) {

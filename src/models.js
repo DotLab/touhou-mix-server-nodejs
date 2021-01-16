@@ -1000,10 +1000,12 @@ exports.Event = mongoose.model('Event', new mongoose.Schema({
 }));
 
 exports.serializeEvent = function(Event) {
-  const {
+  let {
     _id,
     startDate, endDate, name, desc, midiIds, coverPath, midis,
   } = Event;
+
+  if (midis) midis = midis.map((x) => exports.serializeMidi(x));
 
   return {
     id: _id,
