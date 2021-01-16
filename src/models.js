@@ -1000,16 +1000,14 @@ exports.Event = mongoose.model('Event', new mongoose.Schema({
 }));
 
 exports.serializeEvent = function(Event) {
-  let {
+  const {
     _id,
-    startDate, endDate, name, desc, midiIds, coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverPath,
   } = Event;
-
-  if (midis) midis = midis.map((x) => exports.serializeMidi(x));
 
   return {
     id: _id,
-    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath,
   };
 };
 
