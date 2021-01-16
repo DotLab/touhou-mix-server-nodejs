@@ -1002,12 +1002,12 @@ exports.Event = mongoose.model('Event', new mongoose.Schema({
 exports.serializeEvent = function(Event) {
   const {
     _id,
-    startDate, endDate, name, desc, midiIds, coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverPath,
   } = Event;
 
   return {
     id: _id,
-    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath, midis,
+    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath,
   };
 };
 
