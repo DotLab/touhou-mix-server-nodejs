@@ -1695,7 +1695,6 @@ module.exports = class SocketIoSession {
       {$unwind: {path: '$midis.album', preserveNullAndEmptyArrays: true}},
       {$replaceRoot: {newRoot: '$midis'}},
     ]);
-    if (!eventMidis) throw codeError(1, 'not found');
 
     return eventMidis.map((x) => serializeMidi(x));
   }
