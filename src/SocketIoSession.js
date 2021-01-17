@@ -703,7 +703,6 @@ module.exports = class SocketIoSession {
     if (!midi) throw codeError(1, 'not found');
 
     await Midi.findByIdAndUpdate(id, {$set: {status}}, {new: true});
-    return;
   }
 
   async onClWebBoardGetMessages(done) {
