@@ -240,6 +240,7 @@ module.exports = class SocketIoSession {
     this.socket.on('cl_web_midi_most_played', this.onClWebMidiMostPlayed.bind(this));
     this.socket.on('cl_web_midi_recently_played', this.onClWebMidiRecentlyPlayed.bind(this));
     this.socket.on('cl_web_midi_play_history', this.onClWebMidiPlayHistory.bind(this));
+    this.socket.on('ClWebMidiChangeStatus', createRpcHandler(this.onClWebMidiChangeStatus.bind(this)));
 
     this.socket.on('cl_web_soundfont_get', this.onClWebSoundfontGet.bind(this));
     this.socket.on('cl_web_soundfont_list', this.onClWebSoundfontList.bind(this));
@@ -692,6 +693,16 @@ module.exports = class SocketIoSession {
 
     const midis = await Midi.aggregate(pipeline);
     success(done, midis.map((midi) => serializeMidi(midi)));
+  }
+
+  async onClWebMidiChangeStatus({id, status}) {
+    debug('  onClWebMidiChangeStatus', id, status);
+    if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
+
+    const midi = await Midi.findById(id);
+    if (!midi) throw codeError(1, 'not found');
+
+    await Midi.findByIdAndUpdate(id, {$set: {status}}, {new: true});
   }
 
   async onClWebBoardGetMessages(done) {
