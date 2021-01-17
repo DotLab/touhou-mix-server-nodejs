@@ -684,14 +684,14 @@ module.exports = class SocketIoSession {
     success(done, midis.map((midi) => serializeMidi(midi)));
   }
 
-  async onClWebMidiChangeStatus(update) {
-    debug('  onClWebMidiChangeStatus', update);
+  async onClWebMidiChangeStatus({id, status}) {
+    debug('  onClWebMidiChangeStatus', id, status);
     if (!this.checkUserRole(ROLE_MIDI_ADMIN)) throw codeError(0, ERROR_FORBIDDEN);
 
-    const midi = await Midi.findById(update.id);
+    const midi = await Midi.findById(id);
     if (!midi) throw codeError(1, 'not found');
 
-    await Midi.findByIdAndUpdate(update.id, {$set: update}, {new: true});
+    await Midi.findByIdAndUpdate(id, {$set: {status}}, {new: true});
     return;
   }
 
