@@ -380,6 +380,7 @@ exports.Trial = mongoose.model('Trial', new mongoose.Schema({
   goodCount: Number,
   badCount: Number,
   missCount: Number,
+  eventId: ObjectId,
 }));
 
 function getGradeFromAccuracy(accuracy) {
@@ -985,5 +986,38 @@ exports.serializeRanking = function(user) {
     avgCombo, avgAccuracy,
     playTime, onlineTime,
     performance, ranking, gold, sCount, aCount, bCount, cCount, dCount, fCount,
+  };
+};
+
+/** @type {import('mongoose').Model<Object>} */
+exports.Event = mongoose.model('Event', new mongoose.Schema({
+  startDate: Date,
+  endDate: Date,
+  name: String,
+  desc: String,
+  midiIds: [ObjectId],
+  coverPath: String,
+}));
+
+exports.serializeEvent = function(Event) {
+  const {
+    _id,
+    startDate, endDate, name, desc, midiIds, coverPath,
+  } = Event;
+
+  return {
+    id: _id,
+    startDate, endDate, name, desc, midiIds, coverUrl: BUCKET_URL + coverPath,
+  };
+};
+
+exports.createDefaultEvent = function() {
+  return {
+    startDate: null,
+    endDate: null,
+    name: '',
+    desc: '',
+    midiIds: [],
+    coverPath: '',
   };
 };

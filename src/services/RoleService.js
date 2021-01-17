@@ -4,6 +4,7 @@ const ROLE_MIDI_ADMIN = 'midi-admin';
 const ROLE_CARD_MOD = 'card-mod';
 const ROLE_CARD_ADMIN = 'card-admin';
 const ROLE_CARDPOOL_MOD = 'cardPool-mod';
+const ROLE_EVENT_MOD = 'event-mod';
 const ROLE_TRANSLATION_MOD = 'translation-mod';
 const ROLE_SITE_OWNER = 'site-owner';
 const ROLE_ROOT = 'root';
@@ -12,6 +13,7 @@ exports.ROLE_MIDI_ADMIN = ROLE_MIDI_ADMIN;
 exports.ROLE_CARD_MOD = ROLE_CARD_MOD;
 exports.ROLE_CARD_ADMIN = ROLE_CARD_ADMIN;
 exports.ROLE_CARDPOOL_MOD = ROLE_CARDPOOL_MOD;
+exports.ROLE_EVENT_MOD = ROLE_EVENT_MOD;
 exports.ROLE_TRANSLATION_MOD = ROLE_TRANSLATION_MOD;
 exports.ROLE_SITE_OWNER = ROLE_SITE_OWNER;
 exports.ROLE_ROOT = ROLE_ROOT;
@@ -24,6 +26,8 @@ const ROLE_PARENT_DICT = {
   [ROLE_CARD_ADMIN]: ROLE_SITE_OWNER,
 
   [ROLE_CARDPOOL_MOD]: ROLE_SITE_OWNER,
+
+  [ROLE_EVENT_MOD]: ROLE_SITE_OWNER,
 
   [ROLE_TRANSLATION_MOD]: ROLE_SITE_OWNER,
 
