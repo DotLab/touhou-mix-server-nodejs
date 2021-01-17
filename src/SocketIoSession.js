@@ -1773,7 +1773,7 @@ module.exports = class SocketIoSession {
 
     const rankings = await Trial.aggregate(pipeline);
 
-    if (!this.user) return rankings.map((x) => serializeRanking(x));
+    if (!this.user) return {rankings: rankings.map((x) => serializeRanking(x))};
 
     pipeline[0] = {$match: {withdrew: false, userId: new ObjectId(this.user.id), eventId: new ObjectId(id)}};
     let user = await Trial.aggregate(pipeline);
