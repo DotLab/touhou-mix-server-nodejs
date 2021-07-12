@@ -271,7 +271,7 @@ module.exports = class WebSocketSession {
 
     const conditions = {};
     if (query) {
-      conditions.$text = {$search: query};
+      conditions.name = {$regex: query.trim().split(/\s+/).join('.*'), $options: 'i'};
     }
     if (status !== 'undefined') {
       conditions.status = status;
