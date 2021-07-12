@@ -526,11 +526,11 @@ module.exports = class SocketIoSession {
 
     if (!this.user) return error(done, ERROR_FORBIDDEN);
     if (size !== buffer.length) return error(done, 'tampering with api');
-    if (size > MB) return error(done, 'tampering with api');
+    if (size > 10 * MB) return error(done, 'file too large');
 
     const hash = calcFileHash(buffer);
     const midiFile = MidiParser.parse(buffer);
-    if (!midiFile || !(midiFile.tracks > 0)) return error(done, 'tampering with api');
+    if (!midiFile || !(midiFile.tracks > 0)) return error(done, 'cannot parse MIDI file');
 
     let midi = await Midi.findOne({hash});
     if (midi) return success(done, {duplicated: true, id: midi.id});
